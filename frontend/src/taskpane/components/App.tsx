@@ -35,8 +35,8 @@ import {
 } from "../services/wordService";
 
 const NAVY = "#123048";
-// const BACKEND_URL = "http://localhost:5000/api/transcribe";
-const BACKEND_URL = "https://your-backend-api.vercel.app/api/transcribe";
+
+const BACKEND_URL = "https://survey-report-api.vercel.app/api/transcribe";
 const App: React.FC = () => {
   const [sections, setSections] = useState<any[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
