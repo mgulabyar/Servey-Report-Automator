@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": req.headers['content-type'] as string
       },
-      body: req.body // Audio file pass through
+      body: req.body 
     });
 
     const data = await response.json();
