@@ -559,83 +559,82 @@ const App: React.FC = () => {
   //   }
   // };
 
-// const sendToBackend = async (audioBlob: Blob) => {
-//   const formData = new FormData();
-//   formData.append("file", audioBlob, "rec.wav");
+  // const sendToBackend = async (audioBlob: Blob) => {
+  //   const formData = new FormData();
+  //   formData.append("file", audioBlob, "rec.wav");
 
-//   try {
-//     const response = await axios.post(BACKEND_URL, formData, {
-//       headers: { "Content-Type": "multipart/form-data" },
-//       timeout: 25000, 
-//     });
+  //   try {
+  //     const response = await axios.post(BACKEND_URL, formData, {
+  //       headers: { "Content-Type": "multipart/form-data" },
+  //       timeout: 25000,
+  //     });
 
-//     if (response?.data?.text) {
-//       const transcribedText = response.data.text;
-      
-//       try {
-//         await insertTranscribedText(transcribedText);
-//         showToast("Dictation inserted successfully", "success");
-//       } catch (insertError) {
-//         // Sirf console mein rakhein, user ko disturb na karein
-//         console.error("Insertion silent error:", insertError);
-//       }
-//     }
-//   } catch (e: any) {
-//     // 1. Agar backend ne error bheja (400, 500 etc) tabhi toast dikhao
-//     if (e.response) {
-//       showToast("Server error, please try again", "error");
-//     } 
-//     // 2. Agar timeout hua
-//     else if (e.code === 'ECONNABORTED') {
-//       showToast("Request timed out", "error");
-//     }
-//     // 3. Baki sab (Tracking Prevention, network flickers) ko ignore kar dein
-//     else {
-//       console.warn("Silent ignore: Network/Tracking flicker.");
-//     }
-//   } finally {
-//     setActionLoading(false);
-//   }
-// };
+  //     if (response?.data?.text) {
+  //       const transcribedText = response.data.text;
 
-const sendToBackend = async (audioBlob: Blob) => {
-  const formData = new FormData();
-  formData.append("file", audioBlob, "rec.wav");
+  //       try {
+  //         await insertTranscribedText(transcribedText);
+  //         showToast("Dictation inserted successfully", "success");
+  //       } catch (insertError) {
+  //         // Sirf console mein rakhein, user ko disturb na karein
+  //         console.error("Insertion silent error:", insertError);
+  //       }
+  //     }
+  //   } catch (e: any) {
+  //     // 1. Agar backend ne error bheja (400, 500 etc) tabhi toast dikhao
+  //     if (e.response) {
+  //       showToast("Server error, please try again", "error");
+  //     }
+  //     // 2. Agar timeout hua
+  //     else if (e.code === 'ECONNABORTED') {
+  //       showToast("Request timed out", "error");
+  //     }
+  //     // 3. Baki sab (Tracking Prevention, network flickers) ko ignore kar dein
+  //     else {
+  //       console.warn("Silent ignore: Network/Tracking flicker.");
+  //     }
+  //   } finally {
+  //     setActionLoading(false);
+  //   }
+  // };
 
-  try {
-    const response = await axios.post(BACKEND_URL, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      timeout: 30000, 
-    });
+  const sendToBackend = async (audioBlob: Blob) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "rec.wav");
 
-    if (response?.data?.text) {
-      const text = response.data.text;
-      
-      try {
-        await insertTranscribedText(text);
-        showToast("Dictation inserted successfully", "success");
-      } catch (insertError) {
-        console.error("Insertion failed:", insertError);
+    try {
+      const response = await axios.post(BACKEND_URL, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 30000,
+      });
+
+      if (response?.data?.text) {
+        const text = response.data.text;
+        console.log("Response Received:", text); // Check karein console mein text aa raha hai?
+
+        try {
+          // Insertion call
+          await insertTranscribedText(text);
+
+          // Agar yahan tak pohanch gaye, tabhi success dikhao
+          showToast("Dictation inserted successfully", "success");
+        } catch (insertError) {
+          console.error("Word Insertion Error:", insertError);
+          showToast("Text received but Word failed to insert", "error");
+        }
+      } else {
+        showToast("No text received from AI", "error");
       }
-      
-      
+    } catch (e: any) {
+      if (e.response) {
+        showToast(`Server Error: ${e.response.status}`, "error");
+      } else {
+        console.warn("Silent ignore of network flicker");
+      }
+    } finally {
       setActionLoading(false);
-      return; 
     }
-
-  } catch (e: any) {
-  
-    if (e.response) {
-      showToast(`Server Error: ${e.response.status}`, "error");
-    } else {
-  
-      console.warn("Silent ignore of network flicker");
-    }
-  } finally {
-    setActionLoading(false);
-  }
-};
-
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
