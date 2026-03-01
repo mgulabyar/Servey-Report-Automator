@@ -286,17 +286,27 @@ export const finalizeReport = async () => {
   }
 };
 
+// export const insertTranscribedText = async (text: string) => {
+//   await Word.run(async (context) => {
+//     const selection = context.document.getSelection();
+//     const range = selection.insertText(text + " ", Word.InsertLocation.replace);
+//     range.font.italic = true;
+//     range.font.color = "#FFFFFF";
+//     range.font.size = 13;
+//     await context.sync();
+//   });
+// };
+
 export const insertTranscribedText = async (text: string) => {
   await Word.run(async (context) => {
     const selection = context.document.getSelection();
     const range = selection.insertText(text + " ", Word.InsertLocation.replace);
     range.font.italic = true;
-    range.font.color = "#FFFFFF";
+    range.font.color = "#fff";
     range.font.size = 13;
     await context.sync();
   });
 };
-
 export const insertImageInWord = async (base64Image: string) => {
   await Word.run(async (context) => {
     const cleanBase64 = base64Image.split(",")[1] || base64Image;

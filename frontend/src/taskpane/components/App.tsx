@@ -598,44 +598,62 @@ const App: React.FC = () => {
   //   }
   // };
 
-  const sendToBackend = async (audioBlob: Blob) => {
-    const formData = new FormData();
-    formData.append("file", audioBlob, "rec.wav");
+  // const sendToBackend = async (audioBlob: Blob) => {
+  //   const formData = new FormData();
+  //   formData.append("file", audioBlob, "rec.wav");
 
+  //   try {
+  //     const response = await axios.post(BACKEND_URL, formData, {
+  //       headers: { "Content-Type": "multipart/form-data" },
+  //       timeout: 30000,
+  //     });
+
+  //     if (response?.data?.text) {
+  //       const text = response.data.text;
+  //       console.log("Response Received:", text); // Check karein console mein text aa raha hai?
+
+  //       try {
+  //         // Insertion call
+  //         await insertTranscribedText(text);
+
+  
+  //         showToast("Dictation inserted successfully", "success");
+  //       } catch (insertError) {
+  //         console.error("Word Insertion Error:", insertError);
+  //         showToast("Text received but Word failed to insert", "error");
+  //       }
+  //     } else {
+  //       showToast("No text received from AI", "error");
+  //     }
+  //   } catch (e: any) {
+  //     if (e.response) {
+  //       showToast(`Server Error: ${e.response.status}`, "error");
+  //     } else {
+  //       console.warn("Silent ignore of network flicker");
+  //     }
+  //   } finally {
+  //     setActionLoading(false);
+  //   }
+  // };
+
+    const sendToBackend = async (audioBlob: Blob) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob);
     try {
       const response = await axios.post(BACKEND_URL, formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 30000,
       });
-
-      if (response?.data?.text) {
-        const text = response.data.text;
-        console.log("Response Received:", text); // Check karein console mein text aa raha hai?
-
-        try {
-          // Insertion call
-          await insertTranscribedText(text);
-
-          // Agar yahan tak pohanch gaye, tabhi success dikhao
-          showToast("Dictation inserted successfully", "success");
-        } catch (insertError) {
-          console.error("Word Insertion Error:", insertError);
-          showToast("Text received but Word failed to insert", "error");
-        }
-      } else {
-        showToast("No text received from AI", "error");
+      if (response.data.text) {
+        await insertTranscribedText(response.data.text);
+        showToast("Dictation inserted", "success");
       }
-    } catch (e: any) {
-      if (e.response) {
-        showToast(`Server Error: ${e.response.status}`, "error");
-      } else {
-        console.warn("Silent ignore of network flicker");
-      }
+    } catch (e) {
+      showToast("AI transcription error", "error");
     } finally {
       setActionLoading(false);
     }
   };
-
+  
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
