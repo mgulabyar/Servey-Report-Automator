@@ -485,7 +485,7 @@ const App: React.FC = () => {
       setSections(data || []);
       setSelectedTags(data ? data.filter((s) => s.isVisible).map((s) => s.tag) : []);
     } catch (e) {
-      console.error(e);
+      showToast("Error loading sections", "error");
     } finally {
       setLoading(false);
     }
@@ -509,9 +509,13 @@ const App: React.FC = () => {
     setActionLoading(true);
     try {
       const res: any = await syncTableData();
-      if (res && res.success) showToast("Table synced successfully");
+      if (res && res.success) {
+        showToast("Table synced successfully", "success");
+      } else {
+        showToast("Sync completed with no changes", "success");
+      }
     } catch (err) {
-      showToast("Sync failed", "error");
+      showToast("Sync failed. Check Word tags", "error");
     } finally {
       setActionLoading(false);
     }
@@ -532,7 +536,7 @@ const App: React.FC = () => {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      console.error(err);
+      showToast("Microphone access denied", "error");
     }
   };
 
@@ -544,56 +548,19 @@ const App: React.FC = () => {
     }
   };
 
-  // const sendToBackend = async (audioBlob: Blob) => {
-  //   const formData = new FormData();
-  //   formData.append("file", audioBlob);
-  //   try {
-  //     const response = await axios.post(BACKEND_URL, formData, {
-  //       headers: { "Content-Type": "multipart/form-data" },
-  //     });
-  //     if (response.data.text) await insertTranscribedText(response.data.text);
-  //   } catch (e) {
-  //     console.error(e);
-  //   } finally {
-  //     setActionLoading(false);
-  //   }
-  // };
-
- 
-
   const sendToBackend = async (audioBlob: Blob) => {
     const formData = new FormData();
-    formData.append("file", audioBlob, "rec.wav");
-
+    formData.append("file", audioBlob);
     try {
       const response = await axios.post(BACKEND_URL, formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 30000,
       });
-
-      if (response?.data?.text) {
-        const text = response.data.text;
-        console.log("Response Received:", text); // Check karein console mein text aa raha hai?
-
-        try {
-          // Insertion call
-          await insertTranscribedText(text);
-
-          // Agar yahan tak pohanch gaye, tabhi success dikhao
-          showToast("Dictation inserted successfully", "success");
-        } catch (insertError) {
-          console.error("Word Insertion Error:", insertError);
-          showToast("Text received but Word failed to insert", "error");
-        }
-      } else {
-        showToast("No text received from AI", "warning");
+      if (response.data.text) {
+        await insertTranscribedText(response.data.text);
+        showToast("Dictation inserted", "success");
       }
-    } catch (e: any) {
-      if (e.response) {
-        showToast(`Server Error: ${e.response.status}`, "error");
-      } else {
-        console.warn("Silent ignore of network flicker");
-      }
+    } catch (e) {
+      
     } finally {
       setActionLoading(false);
     }
@@ -605,14 +572,14 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         await insertImageInWord(e.target?.result as string);
-        showToast("Photo added");
+        showToast("Photo added", "success");
       };
       reader.readAsDataURL(file);
     }
   };
 
   const emailTypist = () => {
-    window.location.href = `mailto:typist@completesurveys.co.uk?subject=Report Ready&body=The report basis is ready.`;
+    window.location.href = `mailto:typist@completesurveys.co.uk?subject=Report Ready&body=The report basis is ready for finalization.`;
   };
 
   const filteredSections = sections.filter((s) => {
@@ -717,7 +684,7 @@ const App: React.FC = () => {
                   startIcon={isRecording ? <StopIcon /> : <MicIcon />}
                   sx={{ bgcolor: isRecording ? "#d32f2f" : NAVY }}
                 >
-                  {isRecording ? "Stop & Transcribe" : "Start Voice Notes"}
+                  {isRecording ? "Stop and Transcribe" : "Start Voice Notes"}
                 </Button>
               </Paper>
             </Box>
@@ -763,14 +730,14 @@ const App: React.FC = () => {
               </Typography>
               <Paper variant="outlined" sx={{ p: 2, borderLeft: `4px solid ${NAVY}` }}>
                 <Typography variant="body2" sx={{ mb: 2, fontSize: "12px" }}>
-                  Sync ratings and actions from body to table.
+                  Sync ratings and actions from report body to Summary Table.
                 </Typography>
                 <Button
                   fullWidth
                   variant="outlined"
                   onClick={handleSync}
                   startIcon={actionLoading ? <CircularProgress size={20} /> : <SyncAltIcon />}
-                  sx={{ color: NAVY, borderColor: NAVY }}
+                  sx={{ color: NAVY, borderColor: NAVY, fontWeight: 700 }}
                 >
                   Update Summary Table
                 </Button>
@@ -789,14 +756,17 @@ const App: React.FC = () => {
                 Final Submission
               </Typography>
               <Paper variant="outlined" sx={{ p: 2, borderLeft: `4px solid #d32f2f` }}>
+                <Typography variant="body2" sx={{ mb: 2, fontSize: "12px" }}>
+                  Notify your typist that the report basis is ready.
+                </Typography>
                 <Button
                   fullWidth
                   variant="contained"
                   onClick={emailTypist}
                   startIcon={<AlternateEmailIcon />}
-                  sx={{ bgcolor: "#d32f2f" }}
+                  sx={{ bgcolor: "#d32f2f", fontWeight: 700 }}
                 >
-                  Email Completed Report
+                  Email Report
                 </Button>
               </Paper>
             </Box>
@@ -860,8 +830,10 @@ const App: React.FC = () => {
           onClick={async () => {
             setActionLoading(true);
             const res: any = await finalizeReport();
-            if (res && res.success) showToast("Report finalized");
-            await loadData();
+            if (res && res.success) {
+              showToast("Report finalized and cleaned", "success");
+              await loadData();
+            }
             setActionLoading(false);
           }}
           sx={{ bgcolor: NAVY, fontWeight: 800 }}
@@ -883,4 +855,5 @@ const App: React.FC = () => {
     </Box>
   );
 };
+
 export default App;
