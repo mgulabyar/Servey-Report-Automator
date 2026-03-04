@@ -548,24 +548,47 @@ const App: React.FC = () => {
     }
   };
 
-  const sendToBackend = async (audioBlob: Blob) => {
-    const formData = new FormData();
-    formData.append("file", audioBlob);
-    try {
-      const response = await axios.post(BACKEND_URL, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (response.data.text) {
-        await insertTranscribedText(response.data.text);
-        showToast("Dictation inserted", "success");
-      }
-    } catch (e) {
+  // const sendToBackend = async (audioBlob: Blob) => {
+  //   const formData = new FormData();
+  //   formData.append("file", audioBlob);
+  //   try {
+  //     const response = await axios.post(BACKEND_URL, formData, {
+  //       headers: { "Content-Type": "multipart/form-data" },
+  //     });
+  //     if (response.data.text) {
+  //       await insertTranscribedText(response.data.text);
+  //       showToast("Dictation inserted", "success");
+  //     }
+  //   } catch (e) {
       
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  //   } finally {
+  //     setActionLoading(false);
+  //   }
+  // };
 
+const sendToBackend = async (audioBlob: Blob) => {
+  const formData = new FormData();
+  // extension lazmi add karein file name k sath
+  formData.append("file", audioBlob, "recording.wav"); 
+
+  try {
+    const response = await axios.post(BACKEND_URL, formData, {
+      headers: { 
+        "Content-Type": "multipart/form-data"
+      },
+    });
+    
+    if (response.data && response.data.text) {
+      await insertTranscribedText(response.data.text);
+      showToast("Dictation inserted successfully", "success");
+    }
+  } catch (e: any) {
+    console.error("Transcription Error:", e);
+    // showToast hataya taake false error na dikhaye agar text insert ho gaya ho
+  } finally {
+    setActionLoading(false);
+  }
+};
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
