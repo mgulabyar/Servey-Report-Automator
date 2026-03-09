@@ -207,32 +207,49 @@
 // };
 
 /* global Word */
+/* global Word */
 
-// 1. AI Dictation Insert (White color, 13px, Italic)
 export const insertTranscribedText = async (text: string) => {
-  await Word.run(async (context) => {
-    const selection = context.document.getSelection();
-    const range = selection.insertText(text + " ", Word.InsertLocation.replace);
-    range.font.italic = true;
-    range.font.color = "#FFFFFF"; // Pure White as requested
-    range.font.size = 13;
-    await context.sync();
-  });
+  try {
+    await Word.run(async (context) => {
+      const selection = context.document.getSelection();
+
+      // Text insert karna
+      const range = selection.insertText(text + " ", Word.InsertLocation.replace);
+
+      // Formatting: Sirf size aur italic set karenge
+      range.font.italic = true;
+      range.font.size = 13;
+
+      // NOTE: Humne color property ko delete kar diya hai.
+      // Ab Word khud hi "Automatic" color apply karega jo aapke theme k mutabiq hoga.
+
+      await context.sync();
+    });
+  } catch (error) {
+    console.error("Transcription Insert Error:", error);
+  }
 };
 
-// 2. Photo Insert (400x300 size)
+// Baaki functions (insertImageInWord, finalizeReport) waisay hi raheinge
 export const insertImageInWord = async (base64Image: string) => {
-  await Word.run(async (context) => {
-    const cleanBase64 = base64Image.split(",")[1] || base64Image;
-    const selection = context.document.getSelection();
-    const image = selection.insertInlinePictureFromBase64(cleanBase64, Word.InsertLocation.replace);
-    image.width = 400;
-    image.height = 300;
-    await context.sync();
-  });
+  try {
+    await Word.run(async (context) => {
+      const cleanBase64 = base64Image.split(",")[1] || base64Image;
+      const selection = context.document.getSelection();
+      const image = selection.insertInlinePictureFromBase64(
+        cleanBase64,
+        Word.InsertLocation.replace
+      );
+      image.width = 400;
+      image.height = 300;
+      await context.sync();
+    });
+  } catch (error) {
+    console.error("Image Insert Error:", error);
+  }
 };
 
-// 3. Finalize Logic (Hidden text ko hamesha k liye delete karna)
 export const finalizeReport = async () => {
   try {
     return await Word.run(async (context) => {
@@ -248,7 +265,7 @@ export const finalizeReport = async () => {
         await context.sync();
 
         if (range.font.hidden) {
-          cc.delete(true); // Permanent delete
+          cc.delete(true);
           count++;
         }
       }

@@ -450,7 +450,6 @@
 // };
 
 // export default App;
-
 /* global Office */
 import React, { useState, useRef } from "react";
 import axios from "axios";
@@ -506,7 +505,7 @@ const App: React.FC = () => {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      showToast("Mic Access Denied", "error");
+      showToast("Microphone access denied", "error");
     }
   };
 
@@ -525,9 +524,9 @@ const App: React.FC = () => {
       const response = await axios.post(BACKEND_URL, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      if (response.data.text) {
+      if (response.data && response.data.text) {
         await insertTranscribedText(response.data.text);
-        showToast("Dictation inserted");
+        showToast("Dictation inserted successfully");
       }
     } catch (e) {
       /* Error silent */
@@ -542,7 +541,7 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         await insertImageInWord(e.target?.result as string);
-        showToast("Photo added");
+        showToast("Photo added successfully");
       };
       reader.readAsDataURL(file);
     }
@@ -551,7 +550,7 @@ const App: React.FC = () => {
   const handleFinalize = async () => {
     setActionLoading(true);
     const res: any = await finalizeReport();
-    if (res && res.success) showToast(`Cleaned! ${res.count} items removed`);
+    if (res && res.success) showToast(`Report Cleaned! ${res.count} items removed`);
     setActionLoading(false);
   };
 
@@ -646,7 +645,7 @@ const App: React.FC = () => {
                   textTransform: "uppercase",
                 }}
               >
-                Report Finalization
+                Finalize Report
               </Typography>
               <Paper
                 variant="outlined"
