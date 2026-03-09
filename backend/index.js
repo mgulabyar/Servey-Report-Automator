@@ -54,12 +54,12 @@ const multer = require("multer");
 const axios = require("axios");
 const FormData = require("form-data");
 const fs = require("fs");
-const os = require("os"); // Temp folder access k liye
+const os = require("os"); 
 require("dotenv").config();
 
 const app = express();
 
-// 1. CORS FIX: Sirf aapke frontend URL ko allow karein
+
 app.use(cors({
   origin: "https://survey-report-automator.vercel.app",
   methods: ["POST", "GET", "OPTIONS"],

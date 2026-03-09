@@ -34,8 +34,8 @@
 // } from "../services/wordService";
 
 // const NAVY = "#123048";
-// // const BACKEND_URL = "http://localhost:5000/api/transcribe";
 // const BACKEND_URL = "https://survey-report-api.vercel.app/api/transcribe";
+
 // const App: React.FC = () => {
 //   const [sections, setSections] = useState<any[]>([]);
 //   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -118,24 +118,47 @@
 //     }
 //   };
 
-//   const sendToBackend = async (audioBlob: Blob) => {
-//     const formData = new FormData();
-//     formData.append("file", audioBlob);
-//     try {
-//       const response = await axios.post(BACKEND_URL, formData, {
-//         headers: { "Content-Type": "multipart/form-data" },
-//       });
-//       if (response.data.text) {
-//         await insertTranscribedText(response.data.text);
-//         showToast("Dictation inserted", "success");
-//       }
-//     } catch (e) {
-//       showToast("AI transcription error", "error");
-//     } finally {
-//       setActionLoading(false);
-//     }
-//   };
+//   // const sendToBackend = async (audioBlob: Blob) => {
+//   //   const formData = new FormData();
+//   //   formData.append("file", audioBlob);
+//   //   try {
+//   //     const response = await axios.post(BACKEND_URL, formData, {
+//   //       headers: { "Content-Type": "multipart/form-data" },
+//   //     });
+//   //     if (response.data.text) {
+//   //       await insertTranscribedText(response.data.text);
+//   //       showToast("Dictation inserted", "success");
+//   //     }
+//   //   } catch (e) {
 
+//   //   } finally {
+//   //     setActionLoading(false);
+//   //   }
+//   // };
+
+// const sendToBackend = async (audioBlob: Blob) => {
+//   const formData = new FormData();
+//   // extension lazmi add karein file name k sath
+//   formData.append("file", audioBlob, "recording.wav");
+
+//   try {
+//     const response = await axios.post(BACKEND_URL, formData, {
+//       headers: {
+//         "Content-Type": "multipart/form-data"
+//       },
+//     });
+
+//     if (response.data && response.data.text) {
+//       await insertTranscribedText(response.data.text);
+//       showToast("Dictation inserted successfully", "success");
+//     }
+//   } catch (e: any) {
+//     console.error("Transcription Error:", e);
+//     // showToast hataya taake false error na dikhaye agar text insert ho gaya ho
+//   } finally {
+//     setActionLoading(false);
+//   }
+// };
 //   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 //     const file = event.target.files?.[0];
 //     if (file) {
@@ -429,47 +452,33 @@
 // export default App;
 
 /* global Office */
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import axios from "axios";
 import {
   Box,
   Typography,
   Button,
-  Checkbox,
-  FormControlLabel,
   Paper,
   CircularProgress,
   AppBar,
   Toolbar,
-  IconButton,
   Snackbar,
   Alert,
   Tabs,
   Tab,
   Stack,
 } from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import MicIcon from "@mui/icons-material/Mic";
 import StopIcon from "@mui/icons-material/Stop";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import AlternateEmailIcon from "@mui/icons-material/AlternateEmail";
-import SyncAltIcon from "@mui/icons-material/SyncAlt";
-import {
-  getDocumentSections,
-  toggleVisibility,
-  finalizeReport,
-  insertImageInWord,
-  insertTranscribedText,
-  syncTableData,
-} from "../services/wordService";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import { finalizeReport, insertImageInWord, insertTranscribedText } from "../services/wordService";
 
 const NAVY = "#123048";
 const BACKEND_URL = "https://survey-report-api.vercel.app/api/transcribe";
 
 const App: React.FC = () => {
-  const [sections, setSections] = useState<any[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   const [toast, setToast] = useState({ open: false, msg: "", severity: "success" as any });
   const [isRecording, setIsRecording] = useState(false);
@@ -478,47 +487,8 @@ const App: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const data = await getDocumentSections();
-      setSections(data || []);
-      setSelectedTags(data ? data.filter((s) => s.isVisible).map((s) => s.tag) : []);
-    } catch (e) {
-      showToast("Error loading sections", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    Office.onReady(() => loadData());
-  }, []);
-
   const showToast = (msg: string, severity: "success" | "error" = "success") => {
     setToast({ open: true, msg, severity });
-  };
-
-  const handleToggle = async (tag: string) => {
-    const isVisible = !selectedTags.includes(tag);
-    setSelectedTags((prev) => (isVisible ? [...prev, tag] : prev.filter((t) => t !== tag)));
-    await toggleVisibility(tag, isVisible);
-  };
-
-  const handleSync = async () => {
-    setActionLoading(true);
-    try {
-      const res: any = await syncTableData();
-      if (res && res.success) {
-        showToast("Table synced successfully", "success");
-      } else {
-        showToast("Sync completed with no changes", "success");
-      }
-    } catch (err) {
-      showToast("Sync failed. Check Word tags", "error");
-    } finally {
-      setActionLoading(false);
-    }
   };
 
   const startRecording = async () => {
@@ -536,7 +506,7 @@ const App: React.FC = () => {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      showToast("Microphone access denied", "error");
+      showToast("Mic Access Denied", "error");
     }
   };
 
@@ -548,90 +518,42 @@ const App: React.FC = () => {
     }
   };
 
-  // const sendToBackend = async (audioBlob: Blob) => {
-  //   const formData = new FormData();
-  //   formData.append("file", audioBlob);
-  //   try {
-  //     const response = await axios.post(BACKEND_URL, formData, {
-  //       headers: { "Content-Type": "multipart/form-data" },
-  //     });
-  //     if (response.data.text) {
-  //       await insertTranscribedText(response.data.text);
-  //       showToast("Dictation inserted", "success");
-  //     }
-  //   } catch (e) {
-      
-  //   } finally {
-  //     setActionLoading(false);
-  //   }
-  // };
-
-const sendToBackend = async (audioBlob: Blob) => {
-  const formData = new FormData();
-  // extension lazmi add karein file name k sath
-  formData.append("file", audioBlob, "recording.wav"); 
-
-  try {
-    const response = await axios.post(BACKEND_URL, formData, {
-      headers: { 
-        "Content-Type": "multipart/form-data"
-      },
-    });
-    
-    if (response.data && response.data.text) {
-      await insertTranscribedText(response.data.text);
-      showToast("Dictation inserted successfully", "success");
+  const sendToBackend = async (audioBlob: Blob) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "recording.wav");
+    try {
+      const response = await axios.post(BACKEND_URL, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (response.data.text) {
+        await insertTranscribedText(response.data.text);
+        showToast("Dictation inserted");
+      }
+    } catch (e) {
+      /* Error silent */
+    } finally {
+      setActionLoading(false);
     }
-  } catch (e: any) {
-    console.error("Transcription Error:", e);
-    // showToast hataya taake false error na dikhaye agar text insert ho gaya ho
-  } finally {
-    setActionLoading(false);
-  }
-};
+  };
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         await insertImageInWord(e.target?.result as string);
-        showToast("Photo added", "success");
+        showToast("Photo added");
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const emailTypist = () => {
-    window.location.href = `mailto:typist@completesurveys.co.uk?subject=Report Ready&body=The report basis is ready for finalization.`;
+  const handleFinalize = async () => {
+    setActionLoading(true);
+    const res: any = await finalizeReport();
+    if (res && res.success) showToast(`Cleaned! ${res.count} items removed`);
+    setActionLoading(false);
   };
-
-  const filteredSections = sections.filter((s) => {
-    const t = s.tag.toLowerCase();
-    if (tabValue === 0) return t.includes("legal") && !t.includes("tc_");
-    if (tabValue === 1) return t.includes("inst");
-    if (tabValue === 2) return t.includes("struct");
-    if (tabValue === 3) return t.includes("ext") && !t.includes("extjoin");
-    if (tabValue === 4) return t.includes("wall");
-    if (tabValue === 5)
-      return (
-        t.includes("int") &&
-        !t.includes("intjoin") &&
-        !t.includes("intdecor") &&
-        !t.includes("intdrain")
-      );
-    if (tabValue === 6) return t.includes("haz");
-    if (tabValue === 7) return t.includes("join");
-    if (tabValue === 8) return t.includes("drain");
-    if (tabValue === 9) return t.includes("util");
-    if (tabValue === 10) return t.includes("heat");
-    if (tabValue === 11) return t.includes("ground");
-    if (tabValue === 12) return t.includes("env");
-    if (tabValue === 13) return t.includes("app");
-    if (tabValue === 14) return t.includes("glo");
-    if (tabValue === 15) return t.includes("mnt");
-    if (tabValue === 16) return t.includes("tc_");
-    return false;
-  });
 
   return (
     <Box sx={{ bgcolor: "#F4F7F9", minHeight: "100vh" }}>
@@ -640,52 +562,19 @@ const sendToBackend = async (audioBlob: Blob) => {
         elevation={0}
         sx={{ bgcolor: "white", borderBottom: "1px solid #ddd" }}
       >
-        <Toolbar variant="dense" sx={{ justifyContent: "space-between" }}>
-          <Typography sx={{ color: NAVY, fontWeight: 900, fontSize: "12px" }}>
-            AUTO-SURVEY PRO
+        <Toolbar variant="dense">
+          <Typography sx={{ color: NAVY, fontWeight: 900, fontSize: "14px" }}>
+            SURVEYOR TOOLS
           </Typography>
-          <IconButton onClick={loadData} size="small">
-            <RefreshIcon fontSize="small" />
-          </IconButton>
         </Toolbar>
-        <Tabs
-          value={tabValue}
-          onChange={(_, v) => setTabValue(v)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            minHeight: "38px",
-            "& .MuiTab-root": { minHeight: "38px", fontSize: "9px", fontWeight: 700 },
-          }}
-        >
-          <Tab label="Legal" />
-          <Tab label="Inst." />
-          <Tab label="Struct" />
-          <Tab label="Ext." />
-          <Tab label="Walls" />
-          <Tab label="Int." />
-          <Tab label="Hazards" />
-          <Tab label="Joinery" />
-          <Tab label="Drain" />
-          <Tab label="Util" />
-          <Tab label="Heat" />
-          <Tab label="Ground" />
-          <Tab label="Env" />
-          <Tab label="Appx" />
-          <Tab label="Gloss" />
-          <Tab label="Maint" />
-          <Tab label="T&C" />
-          <Tab label="MEDIA" sx={{ color: NAVY, fontWeight: 800 }} />
-          <Tab label="WORKFLOW" sx={{ color: "#d32f2f", fontWeight: 800 }} />
+        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth">
+          <Tab label="MEDIA" sx={{ fontWeight: 700 }} />
+          <Tab label="WORKFLOW" sx={{ fontWeight: 700 }} />
         </Tabs>
       </AppBar>
 
-      <Box p={2} sx={{ pb: 15 }}>
-        {loading ? (
-          <Box textAlign="center" mt={10}>
-            <CircularProgress size={24} sx={{ color: NAVY }} />
-          </Box>
-        ) : tabValue === 17 ? (
+      <Box p={2}>
+        {tabValue === 0 ? (
           <Stack spacing={3}>
             <Box>
               <Typography
@@ -697,20 +586,25 @@ const sendToBackend = async (audioBlob: Blob) => {
                   textTransform: "uppercase",
                 }}
               >
-                AI Dictation Assistant
+                AI Voice Dictation
               </Typography>
-              <Paper variant="outlined" sx={{ p: 2, textAlign: "center", borderStyle: "dashed" }}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}
+              >
                 <Button
                   fullWidth
                   variant="contained"
                   onClick={isRecording ? stopRecording : startRecording}
                   startIcon={isRecording ? <StopIcon /> : <MicIcon />}
-                  sx={{ bgcolor: isRecording ? "#d32f2f" : NAVY }}
+                  sx={{ bgcolor: isRecording ? "#d32f2f" : NAVY, py: 1.2 }}
                 >
-                  {isRecording ? "Stop and Transcribe" : "Start Voice Notes"}
+                  {isRecording ? "Stop & Transcribe" : "Start Speaking"}
                 </Button>
+                {actionLoading && <CircularProgress size={20} sx={{ mt: 1 }} />}
               </Paper>
             </Box>
+
             <Box>
               <Typography
                 sx={{
@@ -721,23 +615,26 @@ const sendToBackend = async (audioBlob: Blob) => {
                   textTransform: "uppercase",
                 }}
               >
-                Photo Integration
+                Visual Documentation
               </Typography>
-              <Paper variant="outlined" sx={{ p: 2, textAlign: "center", borderStyle: "dashed" }}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}
+              >
                 <Button
                   fullWidth
                   variant="outlined"
                   component="label"
                   startIcon={<PhotoCameraIcon />}
-                  sx={{ color: NAVY, borderColor: NAVY }}
+                  sx={{ color: NAVY, borderColor: NAVY, py: 1.2 }}
                 >
-                  Upload Site Photo{" "}
+                  Insert Site Photo{" "}
                   <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
                 </Button>
               </Paper>
             </Box>
           </Stack>
-        ) : tabValue === 18 ? (
+        ) : (
           <Stack spacing={3}>
             <Box>
               <Typography
@@ -749,23 +646,27 @@ const sendToBackend = async (audioBlob: Blob) => {
                   textTransform: "uppercase",
                 }}
               >
-                Data Synchronization
+                Report Finalization
               </Typography>
-              <Paper variant="outlined" sx={{ p: 2, borderLeft: `4px solid ${NAVY}` }}>
-                <Typography variant="body2" sx={{ mb: 2, fontSize: "12px" }}>
-                  Sync ratings and actions from report body to Summary Table.
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderLeft: `4px solid ${NAVY}`, bgcolor: "#fff" }}
+              >
+                <Typography variant="body2" sx={{ mb: 2, fontSize: "13px" }}>
+                  Permanently delete hidden sections to clean the report.
                 </Typography>
                 <Button
                   fullWidth
-                  variant="outlined"
-                  onClick={handleSync}
-                  startIcon={actionLoading ? <CircularProgress size={20} /> : <SyncAltIcon />}
-                  sx={{ color: NAVY, borderColor: NAVY, fontWeight: 700 }}
+                  variant="contained"
+                  onClick={handleFinalize}
+                  startIcon={<CheckCircleIcon />}
+                  sx={{ bgcolor: NAVY, fontWeight: 700 }}
                 >
-                  Update Summary Table
+                  Finalize & Clean
                 </Button>
               </Paper>
             </Box>
+
             <Box>
               <Typography
                 sx={{
@@ -776,93 +677,25 @@ const sendToBackend = async (audioBlob: Blob) => {
                   textTransform: "uppercase",
                 }}
               >
-                Final Submission
+                Submission
               </Typography>
-              <Paper variant="outlined" sx={{ p: 2, borderLeft: `4px solid #d32f2f` }}>
-                <Typography variant="body2" sx={{ mb: 2, fontSize: "12px" }}>
-                  Notify your typist that the report basis is ready.
-                </Typography>
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderLeft: `4px solid #d32f2f`, bgcolor: "#fff" }}
+              >
                 <Button
                   fullWidth
                   variant="contained"
-                  onClick={emailTypist}
+                  onClick={() => (window.location.href = `mailto:typist@completesurveys.co.uk`)}
                   startIcon={<AlternateEmailIcon />}
                   sx={{ bgcolor: "#d32f2f", fontWeight: 700 }}
                 >
-                  Email Report
+                  Email to Typist
                 </Button>
               </Paper>
             </Box>
           </Stack>
-        ) : (
-          filteredSections.map((s) => (
-            <Paper
-              key={s.tag}
-              sx={{ p: 1, mb: 1, border: "1px solid #E0E4E8", borderRadius: "6px" }}
-              elevation={0}
-            >
-              <FormControlLabel
-                sx={{ alignItems: "flex-start", m: 0 }}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={selectedTags.includes(s.tag)}
-                    onChange={() => handleToggle(s.tag)}
-                    sx={{ p: 0.5, "&.Mui-checked": { color: NAVY } }}
-                  />
-                }
-                label={
-                  <Box sx={{ ml: 0.5, mt: 0.3 }}>
-                    <Typography sx={{ fontSize: "11px", fontWeight: 800, color: NAVY }}>
-                      {s.title}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: "9px",
-                        color: "#777",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {s.text}
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Paper>
-          ))
         )}
-      </Box>
-
-      <Box
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          width: "100%",
-          p: 2,
-          bgcolor: "white",
-          borderTop: "1px solid #ddd",
-          zIndex: 100,
-        }}
-      >
-        <Button
-          variant="contained"
-          fullWidth
-          onClick={async () => {
-            setActionLoading(true);
-            const res: any = await finalizeReport();
-            if (res && res.success) {
-              showToast("Report finalized and cleaned", "success");
-              await loadData();
-            }
-            setActionLoading(false);
-          }}
-          sx={{ bgcolor: NAVY, fontWeight: 800 }}
-        >
-          {actionLoading ? <CircularProgress size={20} color="inherit" /> : "FINALIZE REPORT"}
-        </Button>
       </Box>
 
       <Snackbar
