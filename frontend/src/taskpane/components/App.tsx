@@ -291,24 +291,46 @@ const App: React.FC = () => {
     setToast({ open: true, msg, severity });
   };
 
-  const handleFinalize = async () => {
-    console.log("Finalize Button Clicked");
-    setActionLoading(true);
-    try {
-      const res: any = await finalizeReport();
-      console.log("Finalize Result:", res);
-      if (res && res.success) {
-        showToast(`Report Cleaned! ${res.count} items removed`);
-      } else {
-        showToast("Finalize failed or no items to clean", "error");
-      }
-    } catch (err) {
-      console.error("Finalize Error:", err);
-      showToast("Error executing finalize", "error");
-    } finally {
-      setActionLoading(false);
+  // const handleFinalize = async () => {
+  //   console.log("Finalize Button Clicked");
+  //   setActionLoading(true);
+  //   try {
+  //     const res: any = await finalizeReport();
+  //     console.log("Finalize Result:", res);
+  //     if (res && res.success) {
+  //       showToast(`Report Cleaned! ${res.count} items removed`);
+  //     } else {
+  //       showToast("Finalize failed or no items to clean", "error");
+  //     }
+  //   } catch (err) {
+  //     console.error("Finalize Error:", err);
+  //     showToast("Error executing finalize", "error");
+  //   } finally {
+  //     setActionLoading(false);
+  //   }
+  // };
+const handleFinalize = async () => {
+  console.log("User action: Finalize Button Clicked");
+  setActionLoading(true);
+  
+  try {
+    const res = await finalizeReport();
+    
+    if (res && res.success) {
+      console.log("Report cleaned successfully. Details:", res);
+      // loadData() wali line yahan se hata di gayi hai kyunki list ab sidebar mein nahi hai
+      showToast(`Report Cleaned! ${res.count} sections removed`, "success");
+    } else {
+      console.warn("Finalize operation returned no changes or failed.");
+      showToast(res.error || "Nothing to clean or finalize failed", "error");
     }
-  };
+  } catch (err) {
+    console.error("Application Error during finalize:", err);
+    showToast("An unexpected error occurred during finalization", "error");
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   const startRecording = async () => {
     try {

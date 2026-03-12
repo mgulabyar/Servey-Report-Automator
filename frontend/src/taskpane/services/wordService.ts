@@ -332,50 +332,128 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
-export const finalizeReport = async () => {
+// export const finalizeReport = async () => {
+//   try {
+//     return await Word.run(async (context) => {
+//       const contentControls = context.document.contentControls;
+//       // Bohat Aham: font/hidden load karna zaroori hai
+//       context.load(contentControls, "items/tag, items/font/hidden");
+//       await context.sync();
+
+//       const items = contentControls.items;
+//       let count = 0;
+
+//       // Reverse loop to safely delete
+//       for (let i = items.length - 1; i >= 0; i--) {
+//         const cc = items[i];
+//         const tag = (cc.tag || "").toLowerCase().trim();
+
+//         // 1. Handle Sections (sec_...)
+//         if (tag.startsWith("sec_")) {
+//           if (cc.font.hidden === true) {
+//             // Agar hidden hai (Untick tha) to Heading+Para sab delete
+//             cc.delete(false);
+//             count++;
+//           } else {
+//             // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
+//             // To hum poora control wrapper urha denge.
+//             // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
+//             cc.delete(true);
+//           }
+//         }
+//         // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
+//         else if (tag.startsWith("chk_")) {
+//           // cc.delete(false) control aur uska symbol (icon) dono urha dega
+//           cc.delete(false);
+//         }
+//         // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
+//         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
+//           cc.delete(true);
+//         }
+//       }
+
+//       await context.sync();
+//       return { success: true, count: count };
+//     });
+//   } catch (e: any) {
+//     return { success: false, error: e.message };
+//   }
+// };
+
+/* global Word */
+
+/* global Word */
+
+/**
+ * Finalizes the report by removing unchecked sections and cleaning metadata.
+ * Deletes: Unchecked Checkboxes, their linked Headings and Paragraphs.
+ * Cleans: Checked Checkboxes and all Content Control boundaries.
+ */
+export const finalizeReport = async (): Promise<{
+  success: boolean;
+  count: number;
+  error?: string;
+}> => {
+  console.log("--- Finalize Process Started ---");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-      // Bohat Aham: font/hidden load karna zaroori hai
-      context.load(contentControls, "items/tag, items/font/hidden");
+
+      // Load tags and checkbox states
+      context.load(contentControls, "items/tag, items/checkboxState, items/text");
       await context.sync();
 
       const items = contentControls.items;
-      let count = 0;
+      const uncheckedIds: string[] = [];
 
-      // Reverse loop to safely delete
+      // Phase 1: Identify all IDs that are unchecked by the surveyor
+      items.forEach((item: any) => {
+        const tag = (item.tag || "").toLowerCase();
+        if (tag.startsWith("chk_") && item.checkboxState === false) {
+          const id = tag.split("_")[1];
+          if (id) uncheckedIds.push(id);
+        }
+      });
+
+      console.log("IDs marked for full deletion:", uncheckedIds);
+
+      let removedSectionsCount = 0;
+
+      // Phase 2: Reverse loop to safely handle document-wide deletions
       for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i];
+        const cc = items[i] as any;
         const tag = (cc.tag || "").toLowerCase().trim();
+        const id = tag.split("_")[1];
 
-        // 1. Handle Sections (sec_...)
+        // Handle Paragraph/Heading Groups (sec_)
         if (tag.startsWith("sec_")) {
-          if (cc.font.hidden === true) {
-            // Agar hidden hai (Untick tha) to Heading+Para sab delete
-            cc.delete(false); 
-            count++;
+          if (uncheckedIds.includes(id)) {
+            console.log(`Deleting hidden section: ${tag}`);
+            cc.delete(false); // Delete both container and content (Heading + Para)
+            removedSectionsCount++;
           } else {
-            // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
-            // To hum poora control wrapper urha denge. 
-            // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
-            cc.delete(true); 
+            console.log(`Preserving visible section: ${tag}`);
+            cc.delete(true); // Delete only the container, keep the text
           }
-        } 
-        // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
+        }
+        // Handle Checkboxes (chk_)
         else if (tag.startsWith("chk_")) {
-          // cc.delete(false) control aur uska symbol (icon) dono urha dega
-          cc.delete(false);
-        } 
-        // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
+          console.log(`Removing checkbox container: ${tag}`);
+          cc.delete(false); // Permanently remove the checkbox symbol
+        }
+        // Handle Metadata & Sync Fields (val, rate, act)
         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-          cc.delete(true); 
+          console.log(`Cleaning sync field metadata: ${tag}`);
+          cc.delete(true); // Keep data in table/body but remove blue borders
         }
       }
 
       await context.sync();
-      return { success: true, count: count };
+      console.log(`--- Finalize Success. Removed ${removedSectionsCount} sections. ---`);
+      return { success: true, count: removedSectionsCount };
     });
-  } catch (e: any) {
-    return { success: false, error: e.message };
+  } catch (error: any) {
+    console.error("Critical Finalize Error:", error);
+    return { success: false, count: 0, error: error.message };
   }
 };
