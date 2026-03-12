@@ -266,8 +266,8 @@ export const insertImageInWord = async (base64Image: string) => {
         cleanBase64,
         Word.InsertLocation.replace
       );
-      image.width = 400;
-      image.height = 300;
+      image.width = 250;
+      image.height = 180;
       await context.sync();
     });
   } catch (error) {
@@ -335,51 +335,39 @@ export const insertImageInWord = async (base64Image: string) => {
 export const finalizeReport = async () => {
   try {
     return await Word.run(async (context) => {
-      const body = context.document.body;
-      const contentControls = body.contentControls;
-      context.load(contentControls, "items/tag, items/font/hidden, items/text");
+      const contentControls = context.document.contentControls;
+      // Bohat Aham: font/hidden load karna zaroori hai
+      context.load(contentControls, "items/tag, items/font/hidden");
       await context.sync();
 
       const items = contentControls.items;
       let count = 0;
 
-      // STEP 1: Pehle Sections (sec_) handle karein
+      // Reverse loop to safely delete
       for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i] as any;
-        const tag = (cc.tag || "").toLowerCase();
+        const cc = items[i];
+        const tag = (cc.tag || "").toLowerCase().trim();
 
+        // 1. Handle Sections (sec_...)
         if (tag.startsWith("sec_")) {
           if (cc.font.hidden === true) {
-            cc.delete(false); // Hidden section poora delete
+            // Agar hidden hai (Untick tha) to Heading+Para sab delete
+            cc.delete(false); 
             count++;
           } else {
-            // Visible section ka placeholder fix aur boundary removal
-            if (cc.text.includes("Click or tap here") || cc.text.trim() === "") {
-              cc.insertText(" ", "Replace");
-            }
+            // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
+            // To hum poora control wrapper urha denge. 
+            // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
             cc.delete(true); 
           }
-        }
-      }
-      await context.sync();
-
-      // STEP 2: Sab se aham - Checkboxes ko mitao (chk_)
-      // Hum poore document mein 'chk_' se shuru hone wale tags ko dhoond kar urha denge
-      for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i] as any;
-        const tag = (cc.tag || "").toLowerCase();
-        
-        if (tag.startsWith("chk_")) {
-          // range.delete() dabba aur icon dono ko saaf kr deta hai
-          cc.getRange().delete();
-        }
-      }
-
-      // STEP 3: Baqi faltu metadata boxes (val, rate, act) saaf karein
-      for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i] as any;
-        const tag = (cc.tag || "").toLowerCase();
-        if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
+        } 
+        // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
+        else if (tag.startsWith("chk_")) {
+          // cc.delete(false) control aur uska symbol (icon) dono urha dega
+          cc.delete(false);
+        } 
+        // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
+        else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
           cc.delete(true); 
         }
       }
@@ -388,7 +376,6 @@ export const finalizeReport = async () => {
       return { success: true, count: count };
     });
   } catch (e: any) {
-    console.error("Finalize Error:", e);
     return { success: false, error: e.message };
   }
 };
