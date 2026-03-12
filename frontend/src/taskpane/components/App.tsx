@@ -322,7 +322,7 @@ const handleFinalize = async () => {
       showToast(`Finalize Complete! ${res.count} sections cleaned.`, "success");
     } else {
       console.warn("Finalize completed with no changes detected.");
-      showToast(res.error || "No hidden sections found to clean.", "info");
+      showToast(res.error || "No hidden sections found to clean.");
     }
   } catch (err) {
     console.error("Frontend Exception:", err);
