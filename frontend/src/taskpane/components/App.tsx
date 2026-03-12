@@ -309,29 +309,33 @@ const App: React.FC = () => {
   //     setActionLoading(false);
   //   }
   // };
+
 const handleFinalize = async () => {
-  console.log("System Action: Finalize Report Initiated");
+  console.log("Finalize Button Clicked");
   setActionLoading(true);
   
   try {
-    const res = await finalizeReport();
+    // Explicitly define the result type
+    const res: { success: boolean; count: number; error?: string } = await finalizeReport();
     
-    if (res && res.success) {
-      console.log("Cleanup Success:", res);
-      // Successful toast message
-      showToast(`Finalize Complete! ${res.count} sections cleaned.`, "success");
+    console.log("Finalize Result:", res);
+
+    if (res.success) {
+      if (res.count > 0) {
+        showToast(`Report Cleaned! ${res.count} items removed`, "success");
+      } else {
+        showToast("No hidden sections found to clean");
+      }
     } else {
-      console.warn("Finalize completed with no changes detected.");
-      showToast(res.error || "No hidden sections found to clean.");
+      showToast(res.error || "Finalize failed", "error");
     }
   } catch (err) {
-    console.error("Frontend Exception:", err);
-    showToast("Finalize operation failed. Check console for logs.", "error");
+    console.error("Finalize Error:", err);
+    showToast("Error executing finalize", "error");
   } finally {
     setActionLoading(false);
   }
 };
-
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });

@@ -380,67 +380,52 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
-/* global Word */
 
 /* global Word */
 
-/**
- * Finalizes the report by deleting sections marked as hidden or grey.
- * Focuses on Rich Text Content Controls (sec_) as they are reliable in Office.js.
- */
 export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
-  console.log("--- STARTING CLEANUP PROCESS ---");
+  console.log("--- Safe Finalize Started ---");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
       
-      // Sirf Rich Text controls ko load karein (Jo 'sec_' se shuru hote hain)
-      context.load(contentControls, "items/tag, items/font/color, items/font/hidden, items/text");
+      // Load properties
+      context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
       await context.sync();
 
       const items = contentControls.items;
-      let removedSectionsCount = 0;
-
-      console.log(`Scanning document. Found ${items.length} interactive controls.`);
+      let removedCount = 0;
 
       // Reverse loop for safe deletion
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i] as any;
         const tag = (cc.tag || "").toLowerCase().trim();
 
-        // Target only Section Groups (Rich Text)
+        // SIRF 'sec_' wale tags ko check karein
         if (tag.startsWith("sec_")) {
-          
-          // VBA Macro logic checks: 
-          // 1. cc.font.hidden (If marked as hidden)
-          // 2. cc.font.color (If marked as wdGray25 which is #A9A9A9 or similar)
           const isHidden = cc.font.hidden === true;
           const color = (cc.font.color || "").toUpperCase();
           const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
 
+          // Agar section hidden ya grey hai tabhi delete karein
           if (isHidden || isGrey) {
-            console.log(`[Action] Deleting Marked Section: ${tag}`);
-            // cc.delete(false) removes both the container and the text inside (Heading + Para)
-            cc.delete(false); 
-            removedSectionsCount++;
-          } else {
-            console.log(`[Action] Cleaning Visible Section: ${tag}`);
-            // Only remove the blue brackets, keep the professional text
-            cc.delete(true);
+            console.log(`[Action] Deleting Hidden Section: ${tag}`);
+            cc.delete(false); // Poora content (Heading + Para) delete
+            removedCount++;
           }
-        } 
-        // Cleanup Metadata (Table ratings, actions, etc.)
-        else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-          cc.delete(true);
+          // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
         }
+        // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
       }
 
       await context.sync();
-      console.log(`--- CLEANUP FINISHED. Total Deleted: ${removedSectionsCount} ---`);
-      return { success: true, count: removedSectionsCount };
+      console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
+      return { success: true, count: removedCount };
     });
-  } catch (error: any) {
-    console.error("Finalization Error Details:", error);
-    return { success: false, count: 0, error: error.message };
+  } catch (e: any) {
+    console.error("Finalize Error:", e);
+    return { success: false, count: 0, error: e.message };
   }
 };
+
+// ... baqi functions (insertImage, insertTranscribedText, syncTableData) waisay hi rehne dein
