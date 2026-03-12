@@ -197,38 +197,34 @@ export const finalizeReport = async () => {
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-      // Zaruri properties load karein
-      context.load(contentControls, "items/tag, items/text, items/range/font/hidden");
+      // 'cannotEdit' aur 'appearance' load karein taake state ka pata chale
+      context.load(contentControls, "tag, text, appearance, length");
       await context.sync();
 
-      const items = contentControls.items;
       let count = 0;
 
-      // Reverse loop taake deletion order kharab na ho
-      for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i] as any;
+      // Reverse loop for safe deletion
+      for (let i = contentControls.items.length - 1; i >= 0; i--) {
+        const cc = contentControls.items[i];
         const tag = (cc.tag || "").toLowerCase();
 
-        // 1. Handle Sections (sec_)
+        // 1. Agar ye wahi Section hai jise delete hona chahiye
         if (tag.startsWith("sec_")) {
-          if (cc.range.font.hidden) {
-            // Agar hidden hai to poora delete (false ka matlab content samait delete)
-            cc.delete(false);
+          // Check karein agar content empty hai ya aapne koi specific tag lagaya hai delete karne k liye
+          if (cc.text.trim() === "" || cc.text.includes("Click or tap here")) {
+            cc.delete(false); // Delete content and control
             count++;
           } else {
-            // Agar visible hai magar khali hai (placeholder text fix)
-            if (cc.text.trim() === "" || cc.text.includes("Click or tap here")) {
-              cc.insertText(" ", "Replace");
-            }
-            // Sirf boundary dabba hatao, text rehne do
-            cc.delete(true);
+            cc.delete(true); // Keep text, remove boundary
           }
         }
-        // 2. Handle Checkboxes (chk_) - Inhein hamesha poora delete karna hai
+
+        // 2. Checkboxes ko hamesha clean karein
         else if (tag.startsWith("chk_")) {
           cc.delete(false);
         }
-        // 3. Handle Sync Fields (val_, rate_, act_) - Sirf boundary hatao
+
+        // 3. Data fields ki sirf boundary hatayein
         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
           cc.delete(true);
         }
@@ -238,7 +234,6 @@ export const finalizeReport = async () => {
       return { success: true, count: count };
     });
   } catch (e: any) {
-    console.error("Finalize Error:", e);
     return { success: false, error: e.message };
   }
 };
