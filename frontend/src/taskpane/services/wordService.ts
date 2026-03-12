@@ -71,7 +71,7 @@ export const insertTranscribedText = async (text: string) => {
     await Word.run(async (context) => {
       const selection = context.document.getSelection();
       const range = selection.insertText(text + " ", Word.InsertLocation.replace);
-      range.font.size = 13;
+      range.font.size = 12;
       range.font.italic = true;
       range.font.name = "Calibri";
       range.font.color = null;
@@ -101,6 +101,8 @@ export const insertImageInWord = async (base64Image: string) => {
   }
 };
 
+/* global Word */
+
 export const finalizeReport = async () => {
   try {
     return await Word.run(async (context) => {
@@ -111,26 +113,33 @@ export const finalizeReport = async () => {
       const items = contentControls.items;
       let count = 0;
 
+    
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
         const tag = cc.tag || "";
 
         if (tag.startsWith("sec_")) {
-          if (cc.getRange().font.hidden) {
+          const range = cc.getRange();
+          context.load(range, "font/hidden");
+          await context.sync();
+
+          if (range.font.hidden) {
+            // Agar section hidden hai (untick tha) to poora delete karei
             cc.delete(false);
             count++;
           } else {
+            
             cc.delete(true);
           }
-        } else if (
-          tag.startsWith("chk_") ||
-          tag.startsWith("val_") ||
-          tag.startsWith("rate_") ||
-          tag.startsWith("act_")
-        ) {
+        } else if (tag.startsWith("chk_")) {
+          // Checkboxes ko hamesha k liye delete karna hai (content samait)
+          cc.delete(false);
+        } else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
+          // Input fields aur table tags ki sirf boundary hatayein
           cc.delete(true);
         }
       }
+
       await context.sync();
       return { success: true, count };
     });
