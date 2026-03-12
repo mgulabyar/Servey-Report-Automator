@@ -66,8 +66,6 @@
 
 /* global Word */
 
-/* global Word */
-
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
@@ -77,11 +75,10 @@ export const insertTranscribedText = async (text: string) => {
       range.font.italic = true;
       range.font.name = "Calibri";
       range.font.color = null;
-      range.font.highlightColor = null;
       await context.sync();
     });
   } catch (error) {
-    console.error("Transcription Error:", error);
+    console.error("Transcription Insert Error:", error);
   }
 };
 
@@ -99,18 +96,22 @@ export const insertImageInWord = async (base64Image: string) => {
       await context.sync();
     });
   } catch (error) {
-    console.error("Image Error:", error);
+    console.error("Image Insert Error:", error);
   }
 };
 
 export const finalizeReport = async () => {
+  console.log("Starting finalizeReport process...");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-      context.load(contentControls, "items/tag, items/range/font/hidden");
+      // Pehle sirf tags load karein check karne k liye
+      context.load(contentControls, "items/tag");
       await context.sync();
 
       const items = contentControls.items;
+      console.log(`Found ${items.length} total content controls.`);
+
       let count = 0;
 
       for (let i = items.length - 1; i >= 0; i--) {
@@ -118,7 +119,12 @@ export const finalizeReport = async () => {
         const tag = (cc.tag || "").toLowerCase();
 
         if (tag.startsWith("sec_")) {
-          if (cc.range.font.hidden) {
+          // Range load karein specifically visibility check karne k liye
+          const range = cc.getRange();
+          context.load(range, "font/hidden");
+          await context.sync(); // Her item k liye sync zaroori hai agar nested issues hon
+
+          if (range.font.hidden) {
             cc.delete(false);
             count++;
           } else {
@@ -132,9 +138,11 @@ export const finalizeReport = async () => {
       }
 
       await context.sync();
+      console.log("Finalize process completed.");
       return { success: true, count: count };
     });
   } catch (e: any) {
+    console.error("Word API Error in Finalize:", e);
     return { success: false, error: e.message };
   }
 };
