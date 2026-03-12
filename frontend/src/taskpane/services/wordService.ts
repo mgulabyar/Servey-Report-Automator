@@ -275,59 +275,120 @@ export const insertImageInWord = async (base64Image: string) => {
   }
 };
 
+// export const finalizeReport = async () => {
+//   console.log("--- Finalize Started ---");
+//   try {
+//     return await Word.run(async (context) => {
+//       const contentControls = context.document.contentControls;
+
+//       // Bohat Aham: Items ki properties directly load karein
+//       context.load(contentControls, "items/tag, items/text, items/font/hidden");
+//       await context.sync();
+
+//       const items = contentControls.items;
+//       console.log(`Total Controls Found: ${items.length}`);
+
+//       let deletedCount = 0;
+
+//       // Reverse loop taake deletion mein index miss na ho
+//       for (let i = items.length - 1; i >= 0; i--) {
+//         const cc = items[i];
+//         const tag = (cc.tag || "").toLowerCase().trim();
+
+//         // 1. Check for Sections (sec_...)
+//         if (tag.startsWith("sec_")) {
+//           // Agar paragraph hidden hai (Macro se grey/hidden kiya gaya tha)
+//           if (cc.font.hidden === true) {
+//             console.log(`Deleting Hidden Section: ${tag}`);
+//             cc.delete(false); // Poora content delete
+//             deletedCount++;
+//           } else {
+//             // Agar visible hai to sirf blue border hatao
+//             // Placeholder text (Click here...) saaf karein
+//             if (cc.text.includes("Click or tap here") || cc.text.trim() === "") {
+//               cc.insertText(" ", "Replace");
+//             }
+//             cc.delete(true);
+//           }
+//         }
+//         // 2. Check for Checkboxes (chk_...) - Inhein hamesha khatam karna hai
+//         else if (tag.startsWith("chk_")) {
+//           console.log(`Removing Checkbox: ${tag}`);
+//           cc.delete(false);
+//         }
+//         // 3. Check for Input/Table tags (val_, rate_, act_) - Sirf borders hatao
+//         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
+//           cc.delete(true);
+//         }
+//       }
+
+//       await context.sync();
+//       console.log(`--- Finalize Done. Removed ${deletedCount} sections ---`);
+//       return { success: true, count: deletedCount };
+//     });
+//   } catch (e: any) {
+//     console.error("Finalize API Error:", e);
+//     return { success: false, error: e.message };
+//   }
+// };
+
 export const finalizeReport = async () => {
-  console.log("--- Finalize Started ---");
   try {
     return await Word.run(async (context) => {
-      const contentControls = context.document.contentControls;
-
-      // Bohat Aham: Items ki properties directly load karein
-      context.load(contentControls, "items/tag, items/text, items/font/hidden");
+      const body = context.document.body;
+      const contentControls = body.contentControls;
+      context.load(contentControls, "items/tag, items/font/hidden, items/text");
       await context.sync();
 
       const items = contentControls.items;
-      console.log(`Total Controls Found: ${items.length}`);
+      let count = 0;
 
-      let deletedCount = 0;
-
-      // Reverse loop taake deletion mein index miss na ho
+      // STEP 1: Pehle Sections (sec_) handle karein
       for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i];
-        const tag = (cc.tag || "").toLowerCase().trim();
+        const cc = items[i] as any;
+        const tag = (cc.tag || "").toLowerCase();
 
-        // 1. Check for Sections (sec_...)
         if (tag.startsWith("sec_")) {
-          // Agar paragraph hidden hai (Macro se grey/hidden kiya gaya tha)
           if (cc.font.hidden === true) {
-            console.log(`Deleting Hidden Section: ${tag}`);
-            cc.delete(false); // Poora content delete
-            deletedCount++;
+            cc.delete(false); // Hidden section poora delete
+            count++;
           } else {
-            // Agar visible hai to sirf blue border hatao
-            // Placeholder text (Click here...) saaf karein
+            // Visible section ka placeholder fix aur boundary removal
             if (cc.text.includes("Click or tap here") || cc.text.trim() === "") {
               cc.insertText(" ", "Replace");
             }
-            cc.delete(true);
+            cc.delete(true); 
           }
         }
-        // 2. Check for Checkboxes (chk_...) - Inhein hamesha khatam karna hai
-        else if (tag.startsWith("chk_")) {
-          console.log(`Removing Checkbox: ${tag}`);
-          cc.delete(false);
+      }
+      await context.sync();
+
+      // STEP 2: Sab se aham - Checkboxes ko mitao (chk_)
+      // Hum poore document mein 'chk_' se shuru hone wale tags ko dhoond kar urha denge
+      for (let i = items.length - 1; i >= 0; i--) {
+        const cc = items[i] as any;
+        const tag = (cc.tag || "").toLowerCase();
+        
+        if (tag.startsWith("chk_")) {
+          // range.delete() dabba aur icon dono ko saaf kr deta hai
+          cc.getRange().delete();
         }
-        // 3. Check for Input/Table tags (val_, rate_, act_) - Sirf borders hatao
-        else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-          cc.delete(true);
+      }
+
+      // STEP 3: Baqi faltu metadata boxes (val, rate, act) saaf karein
+      for (let i = items.length - 1; i >= 0; i--) {
+        const cc = items[i] as any;
+        const tag = (cc.tag || "").toLowerCase();
+        if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
+          cc.delete(true); 
         }
       }
 
       await context.sync();
-      console.log(`--- Finalize Done. Removed ${deletedCount} sections ---`);
-      return { success: true, count: deletedCount };
+      return { success: true, count: count };
     });
   } catch (e: any) {
-    console.error("Finalize API Error:", e);
+    console.error("Finalize Error:", e);
     return { success: false, error: e.message };
   }
 };
