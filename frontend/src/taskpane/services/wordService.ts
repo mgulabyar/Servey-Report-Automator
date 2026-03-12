@@ -352,23 +352,23 @@ export const insertImageInWord = async (base64Image: string) => {
 //         if (tag.startsWith("sec_")) {
 //           if (cc.font.hidden === true) {
 //             // Agar hidden hai (Untick tha) to Heading+Para sab delete
-//             cc.delete(false);
+//             cc.delete(false); 
 //             count++;
 //           } else {
 //             // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
-//             // To hum poora control wrapper urha denge.
+//             // To hum poora control wrapper urha denge. 
 //             // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
-//             cc.delete(true);
+//             cc.delete(true); 
 //           }
-//         }
+//         } 
 //         // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
 //         else if (tag.startsWith("chk_")) {
 //           // cc.delete(false) control aur uska symbol (icon) dono urha dega
 //           cc.delete(false);
-//         }
+//         } 
 //         // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
 //         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-//           cc.delete(true);
+//           cc.delete(true); 
 //         }
 //       }
 
@@ -385,75 +385,64 @@ export const insertImageInWord = async (base64Image: string) => {
 /* global Word */
 
 /**
- * Finalizes the report by removing unchecked sections and cleaning metadata.
- * Deletes: Unchecked Checkboxes, their linked Headings and Paragraphs.
- * Cleans: Checked Checkboxes and all Content Control boundaries.
+ * Finalizes the report by removing hidden sections and clearing metadata.
+ * Deletes: Hidden Sections (Heading + Para) and ALL Checkbox symbols.
+ * Cleans: Visible content by removing blue bounding boxes.
  */
-export const finalizeReport = async (): Promise<{
-  success: boolean;
-  count: number;
-  error?: string;
-}> => {
-  console.log("--- Finalize Process Started ---");
+export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+  console.log("--- STARTING FINAL CLEANUP ---");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-
-      // Load tags and checkbox states
-      context.load(contentControls, "items/tag, items/checkboxState, items/text");
+      
+      // Load essential properties: Tag, Hidden status and Text
+      context.load(contentControls, "items/tag, items/font/hidden, items/text");
       await context.sync();
 
       const items = contentControls.items;
-      const uncheckedIds: string[] = [];
+      let removedCount = 0;
 
-      // Phase 1: Identify all IDs that are unchecked by the surveyor
-      items.forEach((item: any) => {
-        const tag = (item.tag || "").toLowerCase();
-        if (tag.startsWith("chk_") && item.checkboxState === false) {
-          const id = tag.split("_")[1];
-          if (id) uncheckedIds.push(id);
-        }
-      });
+      console.log(`Analyzing ${items.length} total controls in document...`);
 
-      console.log("IDs marked for full deletion:", uncheckedIds);
-
-      let removedSectionsCount = 0;
-
-      // Phase 2: Reverse loop to safely handle document-wide deletions
+      // Reverse loop to ensure safe deletion order
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i] as any;
         const tag = (cc.tag || "").toLowerCase().trim();
-        const id = tag.split("_")[1];
 
-        // Handle Paragraph/Heading Groups (sec_)
+        // 1. Process Section Groups (sec_...)
         if (tag.startsWith("sec_")) {
-          if (uncheckedIds.includes(id)) {
-            console.log(`Deleting hidden section: ${tag}`);
+          // VBA Macro ne untick hone par isay hidden kar diya hoga
+          if (cc.font.hidden === true) {
+            console.log(`[ACTION] Deleting Hidden Section: ${tag}`);
             cc.delete(false); // Delete both container and content (Heading + Para)
-            removedSectionsCount++;
+            removedCount++;
           } else {
-            console.log(`Preserving visible section: ${tag}`);
-            cc.delete(true); // Delete only the container, keep the text
+            console.log(`[ACTION] Preserving Visible Section: ${tag}`);
+            // Check for placeholder text cleanup
+            if (cc.text.includes("Click or tap here") || cc.text.trim() === "") {
+              cc.insertText(" ", "Replace");
+            }
+            cc.delete(true); // Remove blue border wrapper, keep text
           }
-        }
-        // Handle Checkboxes (chk_)
+        } 
+        // 2. Process ALL Checkboxes (chk_...) - James wants them GONE from final report
         else if (tag.startsWith("chk_")) {
-          console.log(`Removing checkbox container: ${tag}`);
+          console.log(`[ACTION] Removing Checkbox Symbol: ${tag}`);
           cc.delete(false); // Permanently remove the checkbox symbol
-        }
-        // Handle Metadata & Sync Fields (val, rate, act)
+        } 
+        // 3. Process Sync/Metadata Fields (val_, rate_, act_)
         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-          console.log(`Cleaning sync field metadata: ${tag}`);
-          cc.delete(true); // Keep data in table/body but remove blue borders
+          console.log(`[ACTION] Cleaning Metadata Wrapper: ${tag}`);
+          cc.delete(true); // Keep synced value in document, remove blue container
         }
       }
 
       await context.sync();
-      console.log(`--- Finalize Success. Removed ${removedSectionsCount} sections. ---`);
-      return { success: true, count: removedSectionsCount };
+      console.log(`--- FINALIZE COMPLETE. Sections Removed: ${removedCount} ---`);
+      return { success: true, count: removedCount };
     });
   } catch (error: any) {
-    console.error("Critical Finalize Error:", error);
+    console.error("CRITICAL ERROR during finalization:", error);
     return { success: false, count: 0, error: error.message };
   }
 };
