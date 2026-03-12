@@ -385,64 +385,62 @@ export const insertImageInWord = async (base64Image: string) => {
 /* global Word */
 
 /**
- * Finalizes the report by removing hidden sections and clearing metadata.
- * Deletes: Hidden Sections (Heading + Para) and ALL Checkbox symbols.
- * Cleans: Visible content by removing blue bounding boxes.
+ * Finalizes the report by deleting sections marked as hidden or grey.
+ * Focuses on Rich Text Content Controls (sec_) as they are reliable in Office.js.
  */
 export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
-  console.log("--- STARTING FINAL CLEANUP ---");
+  console.log("--- STARTING CLEANUP PROCESS ---");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
       
-      // Load essential properties: Tag, Hidden status and Text
-      context.load(contentControls, "items/tag, items/font/hidden, items/text");
+      // Sirf Rich Text controls ko load karein (Jo 'sec_' se shuru hote hain)
+      context.load(contentControls, "items/tag, items/font/color, items/font/hidden, items/text");
       await context.sync();
 
       const items = contentControls.items;
-      let removedCount = 0;
+      let removedSectionsCount = 0;
 
-      console.log(`Analyzing ${items.length} total controls in document...`);
+      console.log(`Scanning document. Found ${items.length} interactive controls.`);
 
-      // Reverse loop to ensure safe deletion order
+      // Reverse loop for safe deletion
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i] as any;
         const tag = (cc.tag || "").toLowerCase().trim();
 
-        // 1. Process Section Groups (sec_...)
+        // Target only Section Groups (Rich Text)
         if (tag.startsWith("sec_")) {
-          // VBA Macro ne untick hone par isay hidden kar diya hoga
-          if (cc.font.hidden === true) {
-            console.log(`[ACTION] Deleting Hidden Section: ${tag}`);
-            cc.delete(false); // Delete both container and content (Heading + Para)
-            removedCount++;
+          
+          // VBA Macro logic checks: 
+          // 1. cc.font.hidden (If marked as hidden)
+          // 2. cc.font.color (If marked as wdGray25 which is #A9A9A9 or similar)
+          const isHidden = cc.font.hidden === true;
+          const color = (cc.font.color || "").toUpperCase();
+          const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
+
+          if (isHidden || isGrey) {
+            console.log(`[Action] Deleting Marked Section: ${tag}`);
+            // cc.delete(false) removes both the container and the text inside (Heading + Para)
+            cc.delete(false); 
+            removedSectionsCount++;
           } else {
-            console.log(`[ACTION] Preserving Visible Section: ${tag}`);
-            // Check for placeholder text cleanup
-            if (cc.text.includes("Click or tap here") || cc.text.trim() === "") {
-              cc.insertText(" ", "Replace");
-            }
-            cc.delete(true); // Remove blue border wrapper, keep text
+            console.log(`[Action] Cleaning Visible Section: ${tag}`);
+            // Only remove the blue brackets, keep the professional text
+            cc.delete(true);
           }
         } 
-        // 2. Process ALL Checkboxes (chk_...) - James wants them GONE from final report
-        else if (tag.startsWith("chk_")) {
-          console.log(`[ACTION] Removing Checkbox Symbol: ${tag}`);
-          cc.delete(false); // Permanently remove the checkbox symbol
-        } 
-        // 3. Process Sync/Metadata Fields (val_, rate_, act_)
+        // Cleanup Metadata (Table ratings, actions, etc.)
         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-          console.log(`[ACTION] Cleaning Metadata Wrapper: ${tag}`);
-          cc.delete(true); // Keep synced value in document, remove blue container
+          cc.delete(true);
         }
       }
 
       await context.sync();
-      console.log(`--- FINALIZE COMPLETE. Sections Removed: ${removedCount} ---`);
-      return { success: true, count: removedCount };
+      console.log(`--- CLEANUP FINISHED. Total Deleted: ${removedSectionsCount} ---`);
+      return { success: true, count: removedSectionsCount };
     });
   } catch (error: any) {
-    console.error("CRITICAL ERROR during finalization:", error);
+    console.error("Finalization Error Details:", error);
     return { success: false, count: 0, error: error.message };
   }
 };
