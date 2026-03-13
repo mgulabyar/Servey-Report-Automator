@@ -482,19 +482,27 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
       }
 
       // STEP 3: Final Targeted Deletion
-      let removedCount = 0;
-      // Reverse loop taake indexes kharab na hon
+let removedCount = 0;
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
         const tag = (cc.tag || "").trim();
         const parts = tag.split("_");
-        const prefix = parts[0];
-        const id = parts[1];
+        const prefix = parts[0]; // 'chk' or 'sec'
+        const id = parts[1];     // '1', '2' etc.
 
         if (idsToDelete.includes(id)) {
           if (prefix === "chk" || prefix === "sec") {
-            // cc.delete(true) se content aur control dono khatam ho jayenge
-            cc.delete(true); 
+            console.log(`[Deleting] Tag: ${tag}`);
+            
+            // 1. Pehle control ki range pakrein
+            const range = cc.getRange();
+            
+            // 2. Range ko delete karein (Is se checkbox ka nishaan bhi khatam ho jayega)
+            range.delete();
+            
+            // 3. Phir control ko delete karein (Safe side)
+            cc.delete(false); 
+
             removedCount++;
           }
         }
