@@ -316,101 +316,55 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
-// export const finalizeReport = async () => {
+
+
+
+
+
+// export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+//   console.log("--- Safe Finalize Started ---");
 //   try {
 //     return await Word.run(async (context) => {
 //       const contentControls = context.document.contentControls;
-//       // Bohat Aham: font/hidden load karna zaroori hai
-//       context.load(contentControls, "items/tag, items/font/hidden");
+      
+//       // Load properties
+//       context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
 //       await context.sync();
 
 //       const items = contentControls.items;
-//       let count = 0;
+//       let removedCount = 0;
 
-//       // Reverse loop to safely delete
+//       // Reverse loop for safe deletion
 //       for (let i = items.length - 1; i >= 0; i--) {
-//         const cc = items[i];
+//         const cc = items[i] as any;
 //         const tag = (cc.tag || "").toLowerCase().trim();
 
-//         // 1. Handle Sections (sec_...)
+//         // SIRF 'sec_' wale tags ko check karein
 //         if (tag.startsWith("sec_")) {
-//           if (cc.font.hidden === true) {
-//             // Agar hidden hai (Untick tha) to Heading+Para sab delete
-//             cc.delete(false); 
-//             count++;
-//           } else {
-//             // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
-//             // To hum poora control wrapper urha denge. 
-//             // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
-//             cc.delete(true); 
+//           const isHidden = cc.font.hidden === true;
+//           const color = (cc.font.color || "").toUpperCase();
+//           const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
+
+//           // Agar section hidden ya grey hai tabhi delete karein
+//           if (isHidden || isGrey) {
+//             console.log(`[Action] Deleting Hidden Section: ${tag}`);
+//             cc.delete(false); // Poora content (Heading + Para) delete
+//             removedCount++;
 //           }
-//         } 
-//         // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
-//         else if (tag.startsWith("chk_")) {
-//           // cc.delete(false) control aur uska symbol (icon) dono urha dega
-//           cc.delete(false);
-//         } 
-//         // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
-//         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-//           cc.delete(true); 
+//           // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
 //         }
+//         // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
 //       }
 
 //       await context.sync();
-//       return { success: true, count: count };
+//       console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
+//       return { success: true, count: removedCount };
 //     });
 //   } catch (e: any) {
-//     return { success: false, error: e.message };
+//     console.error("Finalize Error:", e);
+//     return { success: false, count: 0, error: e.message };
 //   }
 // };
-
-
-
-
-export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
-  console.log("--- Safe Finalize Started ---");
-  try {
-    return await Word.run(async (context) => {
-      const contentControls = context.document.contentControls;
-      
-      // Load properties
-      context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
-      await context.sync();
-
-      const items = contentControls.items;
-      let removedCount = 0;
-
-      // Reverse loop for safe deletion
-      for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i] as any;
-        const tag = (cc.tag || "").toLowerCase().trim();
-
-        // SIRF 'sec_' wale tags ko check karein
-        if (tag.startsWith("sec_")) {
-          const isHidden = cc.font.hidden === true;
-          const color = (cc.font.color || "").toUpperCase();
-          const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
-
-          // Agar section hidden ya grey hai tabhi delete karein
-          if (isHidden || isGrey) {
-            console.log(`[Action] Deleting Hidden Section: ${tag}`);
-            cc.delete(false); // Poora content (Heading + Para) delete
-            removedCount++;
-          }
-          // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
-        }
-        // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
-      }
-
-      await context.sync();
-      console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
-      return { success: true, count: removedCount };
-    });
-  } catch (e: any) {
-    console.error("Finalize Error:", e);
-    return { success: false, count: 0, error: e.message };
-  }
-};
 
 
 
@@ -442,3 +396,35 @@ export const insertTranscribedText = async (text: string) => {
 
 
 
+/* global Word */
+
+export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+  try {
+    return await Word.run(async (context) => {
+      const contentControls = context.document.contentControls;
+      
+      context.load(contentControls, "items/tag, items/font/hidden");
+      await context.sync();
+
+      const items = contentControls.items;
+      let removedCount = 0;
+
+      for (let i = items.length - 1; i >= 0; i--) {
+        const cc = items[i] as any;
+        const tag = (cc.tag || "").toLowerCase().trim();
+
+        if (tag.startsWith("sec_")) {
+          if (cc.font.hidden === true) {
+            cc.delete(false);
+            removedCount++;
+          }
+        }
+      }
+
+      await context.sync();
+      return { success: true, count: removedCount };
+    });
+  } catch (error: any) {
+    return { success: false, count: 0, error: error.message };
+  }
+};
