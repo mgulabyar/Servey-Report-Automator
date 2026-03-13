@@ -72,57 +72,64 @@ export const insertTranscribedText = async (text: string) => {
 export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
   try {
     return await Word.run(async (context) => {
+
       const contentControls = context.document.contentControls;
-      
-      // 1. Tags aur Hidden status load karein
-      context.load(contentControls, "items/tag, items/font/hidden");
+
+      // Tags aur checkbox state load karo
+      context.load(contentControls, "items/tag, items/checkboxContentControl/isChecked");
       await context.sync();
 
       const items = contentControls.items;
       const idsToDelete: string[] = [];
 
-      // STEP 1: Pehle sirf Hidden Sections ki ID nikaalein (Ye list banana zaroori hai)
+      // STEP 1: Unticked checkbox ki IDs collect karo
       for (let i = 0; i < items.length; i++) {
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
 
-        // Agar Paragraph hidden hai, to uski ID note karlo
-        if (tag.startsWith("sec_") && cc.font.hidden === true) {
-          const id = tag.split("_")[1]; 
-          if (id && !idsToDelete.includes(id)) {
-            idsToDelete.push(id);
-          }
-        }
-      }
+        if (tag.startsWith("chk_")) {
+          const id = tag.split("_")[1];
 
-      console.log("IDs Marked for full deletion:", idsToDelete);
-
-      // STEP 2: Ab in IDs ke 'chk_' aur 'sec_' dono ko delete karein
-      let removedCount = 0;
-      
-      // Reverse loop taake Word ka index kharab na ho
-      for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i];
-        const tag = (cc.tag || "").toLowerCase().trim();
-        const parts = tag.split("_");
-        
-        if (parts.length > 1) {
-          const prefix = parts[0]; 
-          const id = parts[1];
-
-          // AGAR ID match ho jaye, to chahye checkbox ho ya section, delete kar do!
-          if (idsToDelete.includes(id)) {
-            if (prefix === "chk" || prefix === "sec") {
-              // SIRF ye ek line kafi hai, range wala panga khatam
-              cc.delete(true); 
-              removedCount++;
+          if (
+            cc.checkboxContentControl &&
+            cc.checkboxContentControl.isChecked === false
+          ) {
+            if (!idsToDelete.includes(id)) {
+              idsToDelete.push(id);
             }
           }
         }
       }
 
+      console.log("IDs Marked for deletion:", idsToDelete);
+
+      let removedCount = 0;
+
+      // STEP 2: related checkbox aur section delete karo
+      for (let i = items.length - 1; i >= 0; i--) {
+        const cc = items[i];
+        const tag = (cc.tag || "").toLowerCase().trim();
+        const parts = tag.split("_");
+
+        if (parts.length > 1) {
+          const prefix = parts[0];
+          const id = parts[1];
+
+          if (idsToDelete.includes(id)) {
+
+            if (prefix === "chk" || prefix === "sec") {
+              cc.delete(true);
+              removedCount++;
+            }
+
+          }
+        }
+      }
+
       await context.sync();
+
       return { success: true, count: removedCount };
+
     });
   } catch (error: any) {
     console.error("Finalize Error:", error);
