@@ -240,6 +240,7 @@
 
 /* global Word */
 
+
 export const insertImageInWord = async (base64Image: string) => {
   try {
     await Word.run(async (context) => {
@@ -335,23 +336,23 @@ export const insertImageInWord = async (base64Image: string) => {
 //         if (tag.startsWith("sec_")) {
 //           if (cc.font.hidden === true) {
 //             // Agar hidden hai (Untick tha) to Heading+Para sab delete
-//             cc.delete(false);
+//             cc.delete(false); 
 //             count++;
 //           } else {
 //             // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
-//             // To hum poora control wrapper urha denge.
+//             // To hum poora control wrapper urha denge. 
 //             // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
-//             cc.delete(true);
+//             cc.delete(true); 
 //           }
-//         }
+//         } 
 //         // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
 //         else if (tag.startsWith("chk_")) {
 //           // cc.delete(false) control aur uska symbol (icon) dono urha dega
 //           cc.delete(false);
-//         }
+//         } 
 //         // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
 //         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-//           cc.delete(true);
+//           cc.delete(true); 
 //         }
 //       }
 
@@ -363,12 +364,15 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
+
+
+
 // export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
 //   console.log("--- Safe Finalize Started ---");
 //   try {
 //     return await Word.run(async (context) => {
 //       const contentControls = context.document.contentControls;
-
+      
 //       // Load properties
 //       context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
 //       await context.sync();
@@ -408,15 +412,17 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
+
+
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
       // 1. Current cursor position hasil karein
       const selection = context.document.getSelection();
-
+      
       // 2. Text ko cursor ke baad (after) insert karein
       const range = selection.insertText(text, Word.InsertLocation.after);
-
+      
       // 3. Formatting apply karein
       range.font.name = "Arial";
       range.font.size = 10;
@@ -425,7 +431,7 @@ export const insertTranscribedText = async (text: string) => {
       // 4. SAB SE ZAROORI: Cursor ko naye insert kiye gaye text ke end par move karein
       // Is se agla word hamesha iske agay ayega
       range.select(Word.SelectionMode.end);
-
+      
       // Word ko foran update karein
       await context.sync();
     });
@@ -434,48 +440,50 @@ export const insertTranscribedText = async (text: string) => {
   }
 };
 
-export const finalizeReport = async (): Promise<{
-  success: boolean;
-  count: number;
-  error?: string;
-}> => {
+export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-
-      // Sirf basic properties load karein jo har control mein hoti hain
-      context.load(contentControls, "items/tag, items/type, items/font/hidden");
+      
+      // STEP 1: Sirf 'tag' load karein (Ye sab se light aur safe hai)
+      context.load(contentControls, "items/tag");
       await context.sync();
 
       const items = contentControls.items;
       const idsToDelete: string[] = [];
 
-      // STEP 1: Pehle sirf Checkboxes ko scan karein (Safe way)
+      // STEP 2: Loop chala kar sirf 'chk_' aur 'sec_' ko check karein
       for (let i = 0; i < items.length; i++) {
         const cc = items[i];
         const tag = (cc.tag || "").trim();
 
-        // Agar control checkbox hai aur unticked hai
-        if (tag.startsWith("chk_") && cc.type === "CheckBox") {
-          // Checkbox ki state check karne ke liye alag se load karein taake GeneralException na aaye
+        // Agar checkbox hai to uski halat check karein
+        if (tag.startsWith("chk_")) {
+          // Individual load taake GeneralException na aaye
           cc.load("checkboxContentControl/isChecked");
-          await context.sync();
+          await context.sync(); 
 
-          if (cc.checkboxContentControl.isChecked === false) {
+          if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
             const id = tag.split("_")[1];
-            if (id) idsToDelete.push(id);
+            if (id && !idsToDelete.includes(id)) idsToDelete.push(id);
           }
         }
 
-        // Agar VBA ne pehle hi hide kar diya hai
-        if (tag.startsWith("sec_") && cc.font.hidden === true) {
-          const id = tag.split("_")[1];
-          if (id && !idsToDelete.includes(id)) idsToDelete.push(id);
+        // Agar section pehle se hidden hai (VBA logic)
+        if (tag.startsWith("sec_")) {
+          cc.load("font/hidden");
+          await context.sync();
+          
+          if (cc.font.hidden === true) {
+            const id = tag.split("_")[1];
+            if (id && !idsToDelete.includes(id)) idsToDelete.push(id);
+          }
         }
       }
 
-      // STEP 2: Targeted Deletion (Sirf idsToDelete wali list ko touch karega)
+      // STEP 3: Final Targeted Deletion
       let removedCount = 0;
+      // Reverse loop taake indexes kharab na hon
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
         const tag = (cc.tag || "").trim();
@@ -484,9 +492,9 @@ export const finalizeReport = async (): Promise<{
         const id = parts[1];
 
         if (idsToDelete.includes(id)) {
-          // Sirf chk_ aur sec_ ko delete karein, baki tags (val_, rate_) safe rahengy
           if (prefix === "chk" || prefix === "sec") {
-            cc.delete(true); // Content samait delete
+            // cc.delete(true) se content aur control dono khatam ho jayenge
+            cc.delete(true); 
             removedCount++;
           }
         }
@@ -497,6 +505,7 @@ export const finalizeReport = async (): Promise<{
     });
   } catch (e: any) {
     console.error("Finalize Error:", e);
-    return { success: false, count: 0, error: "Word Error: " + e.message };
+    // Agar ab bhi error aaye to iska matlab hai koi tag empty ya corrupt hai
+    return { success: false, count: 0, error: "Error: " + e.message };
   }
 };
