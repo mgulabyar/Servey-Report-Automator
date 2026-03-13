@@ -365,7 +365,52 @@ export const insertImageInWord = async (base64Image: string) => {
 // };
 
 
-/* global Word */
+
+
+// export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+//   console.log("--- Safe Finalize Started ---");
+//   try {
+//     return await Word.run(async (context) => {
+//       const contentControls = context.document.contentControls;
+      
+//       // Load properties
+//       context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
+//       await context.sync();
+
+//       const items = contentControls.items;
+//       let removedCount = 0;
+
+//       // Reverse loop for safe deletion
+//       for (let i = items.length - 1; i >= 0; i--) {
+//         const cc = items[i] as any;
+//         const tag = (cc.tag || "").toLowerCase().trim();
+
+//         // SIRF 'sec_' wale tags ko check karein
+//         if (tag.startsWith("sec_")) {
+//           const isHidden = cc.font.hidden === true;
+//           const color = (cc.font.color || "").toUpperCase();
+//           const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
+
+//           // Agar section hidden ya grey hai tabhi delete karein
+//           if (isHidden || isGrey) {
+//             console.log(`[Action] Deleting Hidden Section: ${tag}`);
+//             cc.delete(false); // Poora content (Heading + Para) delete
+//             removedCount++;
+//           }
+//           // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
+//         }
+//         // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
+//       }
+
+//       await context.sync();
+//       console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
+//       return { success: true, count: removedCount };
+//     });
+//   } catch (e: any) {
+//     console.error("Finalize Error:", e);
+//     return { success: false, count: 0, error: e.message };
+//   }
+// };
 
 export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
   console.log("--- Safe Finalize Started ---");
@@ -373,37 +418,60 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
       
-      // Load properties
-      context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
+      // Load only necessary properties
+      // checkboxContentControl is vital to see if it's unticked
+      context.load(contentControls, "items/tag, items/checkboxContentControl/isChecked");
       await context.sync();
 
       const items = contentControls.items;
+      const idsToDelete: string[] = [];
+
+      // STEP 1: Sirf wo IDs dhundo jo UNTICKED hain
+      for (let i = 0; i < items.length; i++) {
+        const cc = items[i];
+        const tag = (cc.tag || "").trim();
+
+        // Agar tag 'chk_123' jesa hai aur unticked hai
+        if (tag.startsWith("chk_")) {
+            if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
+                const id = tag.split("_")[1]; // Get the '123' part
+                if (id && !idsToDelete.includes(id)) {
+                    idsToDelete.push(id);
+                }
+            }
+        }
+      }
+
+      console.log("IDs marked for deletion:", idsToDelete);
+
+      if (idsToDelete.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      // STEP 2: Ab sirf un IDs se related 'chk_' aur 'sec_' ko delete karo
       let removedCount = 0;
-
-      // Reverse loop for safe deletion
+      // Reverse loop is mandatory when deleting
       for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i] as any;
-        const tag = (cc.tag || "").toLowerCase().trim();
+        const cc = items[i];
+        const tag = (cc.tag || "").trim();
+        const parts = tag.split("_");
+        const prefix = parts[0]; // 'chk' or 'sec'
+        const id = parts[1];     // '1' or '2' etc.
 
-        // SIRF 'sec_' wale tags ko check karein
-        if (tag.startsWith("sec_")) {
-          const isHidden = cc.font.hidden === true;
-          const color = (cc.font.color || "").toUpperCase();
-          const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
-
-          // Agar section hidden ya grey hai tabhi delete karein
-          if (isHidden || isGrey) {
-            console.log(`[Action] Deleting Hidden Section: ${tag}`);
-            cc.delete(false); // Poora content (Heading + Para) delete
+        // SIRF tab delete karo agar ID 'idsToDelete' list mein ho
+        // Aur tag sirf 'chk_' ya 'sec_' se shuru ho raha ho
+        if (idsToDelete.includes(id)) {
+          if (prefix === "chk" || prefix === "sec") {
+            console.log(`[Deleting] Tag: ${tag}`);
+            
+            // cc.delete(true) removes the control AND the content inside it
+            cc.delete(true); 
             removedCount++;
           }
-          // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
         }
-        // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
       }
 
       await context.sync();
-      console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
       return { success: true, count: removedCount };
     });
   } catch (e: any) {
@@ -412,33 +480,6 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
   }
 };
 
-// ... baqi functions (insertImage, insertTranscribedText, syncTableData) waisay hi rehne dein
-// ye kam kr rhi ha
-// export const insertTranscribedText = async (text: string) => {
-//   try {
-//     await Word.run(async (context) => {
-//       // Current selection (cursor position) pakrein
-//       const selection = context.document.getSelection();
-      
-//       // Text ko cursor k aage insert karein (taake real-time typing lage)
-//       const range = selection.insertText(text, Word.InsertLocation.end);
-      
-//       // James's Formatting
-//       range.font.size = 11;
-//       // range.font.italic = true;
-//       range.font.name = "Calibri";
-//       range.font.color = null; // Automatic based on theme
-      
-//       // Cursor ko naye text k aakhir mein le jayein taake agla lafz agay aye
-//       range.select(Word.SelectionMode.end);
-      
-//       await context.sync();
-//     });
-//   } catch (error) {
-//     // Console error ko ignore karein taake user disturb na ho
-//     console.warn("Word API Syncing...");
-//   }
-// };
 
 export const insertTranscribedText = async (text: string) => {
   try {
