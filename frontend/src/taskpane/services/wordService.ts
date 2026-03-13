@@ -18,22 +18,19 @@ export const insertImageInWord = async (base64Image: string) => {
   }
 };
 
-
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
-      
       const selection = context.document.getSelection();
-      
+
       const range = selection.insertText(text, Word.InsertLocation.after);
-      
+
       range.font.name = "Arial";
       range.font.size = 10;
       range.font.bold = false;
-    
+
       range.select(Word.SelectionMode.end);
-      
-  
+
       await context.sync();
     });
   } catch (error) {
@@ -44,7 +41,7 @@ export const insertTranscribedText = async (text: string) => {
 //   try {
 //     return await Word.run(async (context) => {
 //       const contentControls = context.document.contentControls;
-      
+
 //       context.load(contentControls, "items/tag, items/font/hidden");
 //       await context.sync();
 
@@ -72,11 +69,15 @@ export const insertTranscribedText = async (text: string) => {
 // };
 
 //////////////////////////// iu is  sucessful ha hiden succestion delete kr ny k lie.//////
-export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+export const finalizeReport = async (): Promise<{
+  success: boolean;
+  count: number;
+  error?: string;
+}> => {
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-      
+
       // 1. Tags aur Hidden status load karein
       context.load(contentControls, "items/tag, items/font/hidden");
       await context.sync();
@@ -84,12 +85,11 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
       const items = contentControls.items;
       const idsToDelete: string[] = [];
 
-      // STEP 1: Pehle hidden sections ki ID nikaalein (e.g., '1', '2')
+      // STEP 1: Pehle Hidden Sections (sec_) ki IDs ki list banaein
       for (let i = 0; i < items.length; i++) {
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
 
-        // Agar VBA ne sec_ ko hide kiya hai, to uski ID note kar lo
         if (tag.startsWith("sec_") && cc.font.hidden === true) {
           const parts = tag.split("_");
           if (parts.length > 1) {
@@ -101,11 +101,16 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
         }
       }
 
-      console.log("IDs to be completely removed:", idsToDelete);
+      console.log("Found IDs to delete (Checkbox + Section):", idsToDelete);
 
-      // STEP 2: Ab un IDs ke 'sec_' AUR 'chk_' dono ko delete karein
+      if (idsToDelete.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      // STEP 2: Ab in IDs se linked 'chk_' AUR 'sec_' dono ko delete karein
       let removedCount = 0;
-      // Reverse loop lazmi hai taake deletion sahi ho
+
+      // Reverse loop taake deletion ke waqt index kharab na ho
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
@@ -113,13 +118,17 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 
         if (parts.length > 1) {
           const prefix = parts[0]; // 'chk' or 'sec'
-          const id = parts[1];     // '1', '2' etc.
+          const id = parts[1]; // '1', '2' etc.
 
-          // Agar ye ID delete honi hai, to chahye checkbox ho ya section, dono delete kar do
           if (idsToDelete.includes(id)) {
-            if (prefix === "sec" || prefix === "chk") {
-              // cc.delete(true) se content aur control dono khatam ho jayenge
-              cc.delete(true); 
+            // Checkbox ho ya Section, dono ko target karein
+            if (prefix === "chk" || prefix === "sec") {
+              console.log(`[Deleting] Tag: ${tag}`);
+
+              // Pehle range clear karein phir control delete karein (Checkbox ke liye zaroori hai)
+              cc.getRange().delete();
+              cc.delete(false);
+
               removedCount++;
             }
           }
