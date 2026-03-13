@@ -439,56 +439,61 @@ export const finalizeReport = async (): Promise<{
   count: number;
   error?: string;
 }> => {
+  console.log("--- Targeted Finalize Started ---");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
 
-      // Load tags first
+      // STEP 1: Sirf 'tag' aur 'type' load karein (Safe and Light)
       context.load(contentControls, "items/tag, items/type");
       await context.sync();
 
       const items = contentControls.items;
       const idsToDelete: string[] = [];
 
-      // STEP 1: Find IDs of unticked checkboxes
+      // STEP 2: Unticked Checkboxes ki IDs dhoondein
       for (let i = 0; i < items.length; i++) {
         const cc = items[i];
         const tag = (cc.tag || "").trim();
 
-        if (tag.startsWith("chk_")) {
-          // Checkbox status check
+        // Sirf un controls ko touch karein jo 'chk_' hain aur Type 'CheckBox' hai
+        if (tag.startsWith("chk_") && cc.type === "CheckBox") {
           cc.load("checkboxContentControl/isChecked");
-          await context.sync();
+          await context.sync(); // Individual sync taake GeneralException na aaye
 
           if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
             const idParts = tag.split("_");
             if (idParts.length > 1) {
-              idsToDelete.push(idParts[1]); // e.g., "1"
+              idsToDelete.push(idParts[1]); // ID save karli (e.g. "1")
             }
           }
         }
       }
 
-      console.log("Marked IDs for deletion:", idsToDelete);
+      console.log("IDs to be removed (Checkbox + Section):", idsToDelete);
 
-      // STEP 2: Delete linked 'chk_' and 'sec_'
+      if (idsToDelete.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      // STEP 3: Linked 'chk_' aur 'sec_' dono ko delete karein
       let removedCount = 0;
-      // Reverse loop is safest
+      // Reverse loop lazmi hai taake deletion ke waqt index kharab na ho
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
         const tag = (cc.tag || "").trim();
         const parts = tag.split("_");
 
         if (parts.length > 1) {
-          const prefix = parts[0]; // 'chk' or 'sec'
+          const prefix = parts[0].toLowerCase(); // 'chk' or 'sec'
           const id = parts[1]; // '1', '2' etc.
 
+          // Agar ye ID delete honi hai aur prefix chk/sec hai
           if (idsToDelete.includes(id)) {
             if (prefix === "chk" || prefix === "sec") {
-              console.log(`[Action] Removing: ${tag}`);
+              console.log(`[Deleting] ${tag}`);
 
-              // SIRF ye ek line kafi hai control aur content delete karne ke liye
-              // Agar ye na chale to sirf cc.delete(true) use karein
+              // delete(true) content control aur uske andar ka content (icon/text) dono urra deta hai
               cc.delete(true);
               removedCount++;
             }
@@ -497,6 +502,7 @@ export const finalizeReport = async (): Promise<{
       }
 
       await context.sync();
+      console.log(`Finalize Complete. Total items removed: ${removedCount}`);
       return { success: true, count: removedCount };
     });
   } catch (e: any) {
