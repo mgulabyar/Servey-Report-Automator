@@ -246,9 +246,9 @@ export const insertTranscribedText = async (text: string) => {
       const selection = context.document.getSelection();
       selection.font.hidden = false;
       const range = selection.insertText(text + " ", Word.InsertLocation.replace);
-      range.font.size = 13;
-      range.font.italic = true;
-      range.font.name = "Calibri";
+      range.font.size = 12;
+      // range.font.italic = true;
+      range.font.name = "Arial";
       range.font.color = null;
       await context.sync();
     });

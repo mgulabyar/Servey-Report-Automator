@@ -279,6 +279,7 @@ const NAVY = "#123048";
 const BACKEND_URL = "https://survey-report-api.vercel.app/api/transcribe";
 
 const App: React.FC = () => {
+  const recognitionRef = useRef<any>(null);
   const [tabValue, setTabValue] = useState(0);
   const [toast, setToast] = useState({ open: false, msg: "", severity: "success" as any });
   const [isRecording, setIsRecording] = useState(false);
@@ -336,31 +337,80 @@ const handleFinalize = async () => {
     setActionLoading(false);
   }
 };
+  // const startRecording = async () => {
+  //   try {
+  //     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  //     const mediaRecorder = new MediaRecorder(stream);
+  //     mediaRecorderRef.current = mediaRecorder;
+  //     audioChunksRef.current = [];
+  //     mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+  //     mediaRecorder.onstop = async () => {
+  //       const blob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+  //       await sendToBackend(blob);
+  //       stream.getTracks().forEach((t) => t.stop());
+  //     };
+  //     mediaRecorder.start();
+  //     setIsRecording(true);
+  //   } catch (err) { showToast("Mic Access Denied", "error"); }
+  // };
+
+  // const stopRecording = () => {
+  //   if (mediaRecorderRef.current) {
+  //     mediaRecorderRef.current.stop();
+  //     setIsRecording(false);
+  //     setActionLoading(true);
+  //   }
+  // };
+
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-        await sendToBackend(blob);
-        stream.getTracks().forEach((t) => t.stop());
-      };
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) { showToast("Mic Access Denied", "error"); }
-  };
+      // Browser Speech Recognition Setup
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showToast("Browser does not support real-time dictation", "error");
+        return;
+      }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setActionLoading(true);
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      
+      recognition.continuous = true; // Bolte waqt chalta rahega
+      recognition.interimResults = false; // Sirf final words bhejega (fast and clean)
+      recognition.lang = 'en-GB'; // James UK ka hai to English UK set ki hai
+
+      recognition.onresult = async (event: any) => {
+        const lastResultIndex = event.results.length - 1;
+        const transcript = event.results[lastResultIndex][0].transcript;
+        
+        // Word mein real-time insert karein
+        await insertTranscribedText(transcript + " ");
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech Error:", event.error);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+      setIsRecording(true);
+      showToast("Listening... speak now", "success");
+
+    } catch (err) {
+      showToast("Microphone access denied", "error");
     }
   };
 
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      showToast("Dictation stopped");
+    }
+  };
   const sendToBackend = async (audioBlob: Blob) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.wav");
