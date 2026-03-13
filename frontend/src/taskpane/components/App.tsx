@@ -365,9 +365,6 @@ const handleFinalize = async () => {
   // App.tsx ke andar sirf ye functions update karein
 
 
-// App.tsx ke andar startRecording function ko is se badlein:
-
-// App.tsx ke andar startRecording function ko is se replace karein:
 
 const startRecording = async () => {
   try {
@@ -381,34 +378,25 @@ const startRecording = async () => {
     recognitionRef.current = recognition;
 
     recognition.continuous = true;
-    recognition.interimResults = true; // Taake browser tezi se detect kare
+    recognition.interimResults = false; // Delay kam karne ke liye isko false rakhein (ya true rakhein agar live preview chahiye)
     recognition.lang = 'en-GB';
 
-    // Queue management variables
-    let finalizedIndex = 0;
-    let isProcessing = false;
-    const textQueue: string[] = [];
-
-    // Queue ko process karne wala function
-    const processQueue = async () => {
-      if (isProcessing || textQueue.length === 0) return;
-      isProcessing = true;
-      const nextText = textQueue.shift();
-      if (nextText) {
-        await insertTranscribedText(nextText);
-      }
-      isProcessing = false;
-      processQueue(); // Agla lafz check karo
-    };
+    // Race condition se bachne ke liye lock
+    let isInserting = false;
 
     recognition.onresult = async (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        // Jab browser lafz finalize kare (isFinal)
-        if (event.results[i].isFinal && i >= finalizedIndex) {
-          const newChunk = event.results[i][0].transcript.trim();
-          textQueue.push(newChunk + " "); // Queue mein dalo
-          finalizedIndex = i + 1;
-          processQueue(); // Queue chalana shuru karo
+        if (event.results[i].isFinal) {
+          const newChunk = event.results[i][0].transcript.trim() + " ";
+          
+          // Jab tak पिछला word insert ho raha ho, wait karein
+          while (isInserting) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+
+          isInserting = true;
+          await insertTranscribedText(newChunk);
+          isInserting = false;
         }
       }
     };
@@ -418,12 +406,13 @@ const startRecording = async () => {
 
     recognition.start();
     setIsRecording(true);
-    showToast("Listening... speak naturally", "success");
+    showToast("Listening...", "success");
 
   } catch (err) {
     showToast("Mic Error", "error");
   }
 };
+
 const stopRecording = () => {
   if (recognitionRef.current) {
     recognitionRef.current.stop();
