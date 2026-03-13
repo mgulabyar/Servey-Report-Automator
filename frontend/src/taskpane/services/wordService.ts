@@ -440,34 +440,30 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 //   }
 // };
 
-
-/* global Word */
-
-/* global Word */
-
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
-      // 1. Current selection (cursor position) pakrein
+      // 1. Current cursor position (selection) hasil karein
       const selection = context.document.getSelection();
       
-      // 2. Text ko selection ke baad (After) insert karein
-      // "After" use karne se purana text apni jagah rehta hai aur naya agay jata hai
-      const range = selection.insertText(text, Word.InsertLocation.after);
+      // 2. IMPORTANT: "End" use karein taake cursor jahan hai wahan text insert ho
+      // Aur purana text overwrite na ho
+      const range = selection.insertText(text, Word.InsertLocation.end);
       
-      // 3. Arial 11px Formatting
+      // 3. Formatting apply karein
       range.font.name = "Arial";
       range.font.size = 10;
       range.font.bold = false;
       range.font.italic = false;
-      range.font.color = null; // Dark mode aur light mode dono k liye black fix
 
-      // 4. Cursor ko is naye lafz ke bilkul end par move karein
+      // 4. Sab se zaroori: Cursor ko naye insert kiye gaye text ke BILKUL END par le jayen
+      // "Select" mode use karne se focus agly point par chala jata hai
       range.select(Word.SelectionMode.end);
       
+      // 5. Context ko sync karein taake Word ko pata chale cursor move ho gaya hai
       await context.sync();
     });
   } catch (error) {
-    console.warn("Syncing...");
+    console.warn("Error inserting text:", error);
   }
 };
