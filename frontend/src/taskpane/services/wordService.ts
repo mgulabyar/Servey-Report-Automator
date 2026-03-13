@@ -75,32 +75,13 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 
       const contentControls = context.document.contentControls;
 
-      // IMPORTANT: type bhi load karo
-      context.load(contentControls, "items/tag, items/type");
+      context.load(contentControls, "items/tag, items/text");
       await context.sync();
 
       const items = contentControls.items;
-
       const idsToDelete: string[] = [];
 
-      // STEP 1: checkbox controls load karo
-      for (let i = 0; i < items.length; i++) {
-
-        const cc = items[i];
-        const tag = (cc.tag || "").toLowerCase().trim();
-
-        if (tag.startsWith("chk_")) {
-
-          const checkbox = cc.checkboxContentControl;
-          context.load(checkbox, "isChecked");
-
-        }
-
-      }
-
-      await context.sync();
-
-      // STEP 2: Unticked IDs collect karo
+      // STEP 1: Unticked checkbox find karo
       for (let i = 0; i < items.length; i++) {
 
         const cc = items[i];
@@ -109,8 +90,10 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
         if (tag.startsWith("chk_")) {
 
           const id = tag.split("_")[1];
+          const text = (cc.text || "").trim();
 
-          if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
+          // unchecked checkbox usually empty ya ☐ hota hai
+          if (text === "" || text === "☐") {
 
             if (!idsToDelete.includes(id)) {
               idsToDelete.push(id);
@@ -126,7 +109,7 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 
       let removedCount = 0;
 
-      // STEP 3: related checkbox + section delete
+      // STEP 2: related checkbox + section delete
       for (let i = items.length - 1; i >= 0; i--) {
 
         const cc = items[i];
