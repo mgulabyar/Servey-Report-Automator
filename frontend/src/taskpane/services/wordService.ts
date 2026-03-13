@@ -260,7 +260,7 @@ export const insertImageInWord = async (base64Image: string) => {
 };
 
 // export const finalizeReport = async () => {
-//   console.log("--- Finalize Started ---");
+//   console.log("Finalize Started ");
 //   try {
 //     return await Word.run(async (context) => {
 //       const contentControls = context.document.contentControls;
@@ -367,50 +367,50 @@ export const insertImageInWord = async (base64Image: string) => {
 
 
 
-// export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
-//   console.log("--- Safe Finalize Started ---");
-//   try {
-//     return await Word.run(async (context) => {
-//       const contentControls = context.document.contentControls;
+export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+  console.log("--- Safe Finalize Started ---");
+  try {
+    return await Word.run(async (context) => {
+      const contentControls = context.document.contentControls;
       
-//       // Load properties
-//       context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
-//       await context.sync();
+      // Load properties
+      context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
+      await context.sync();
 
-//       const items = contentControls.items;
-//       let removedCount = 0;
+      const items = contentControls.items;
+      let removedCount = 0;
 
-//       // Reverse loop for safe deletion
-//       for (let i = items.length - 1; i >= 0; i--) {
-//         const cc = items[i] as any;
-//         const tag = (cc.tag || "").toLowerCase().trim();
+      // Reverse loop for safe deletion
+      for (let i = items.length - 1; i >= 0; i--) {
+        const cc = items[i] as any;
+        const tag = (cc.tag || "").toLowerCase().trim();
 
-//         // SIRF 'sec_' wale tags ko check karein
-//         if (tag.startsWith("sec_")) {
-//           const isHidden = cc.font.hidden === true;
-//           const color = (cc.font.color || "").toUpperCase();
-//           const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
+        // SIRF 'sec_' wale tags ko check karein
+        if (tag.startsWith("sec_")) {
+          const isHidden = cc.font.hidden === true;
+          const color = (cc.font.color || "").toUpperCase();
+          const isGrey = color === "#A9A9A9" || color === "#D3D3D3" || color === "#C0C0C0" || color === "#808080";
 
-//           // Agar section hidden ya grey hai tabhi delete karein
-//           if (isHidden || isGrey) {
-//             console.log(`[Action] Deleting Hidden Section: ${tag}`);
-//             cc.delete(false); // Poora content (Heading + Para) delete
-//             removedCount++;
-//           }
-//           // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
-//         }
-//         // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
-//       }
+          // Agar section hidden ya grey hai tabhi delete karein
+          if (isHidden || isGrey) {
+            console.log(`[Action] Deleting Hidden Section: ${tag}`);
+            cc.delete(false); // Poora content (Heading + Para) delete
+            removedCount++;
+          }
+          // ELSE wala part nikal dia hai taake visible tags mehfooz rahein
+        }
+        // chk_, val_, rate_, act_ ko ab ye code touch bhi nahi karega
+      }
 
-//       await context.sync();
-//       console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
-//       return { success: true, count: removedCount };
-//     });
-//   } catch (e: any) {
-//     console.error("Finalize Error:", e);
-//     return { success: false, count: 0, error: e.message };
-//   }
-// };
+      await context.sync();
+      console.log(`--- Finalize Done. Removed: ${removedCount} ---`);
+      return { success: true, count: removedCount };
+    });
+  } catch (e: any) {
+    console.error("Finalize Error:", e);
+    return { success: false, count: 0, error: e.message };
+  }
+};
 
 
 
@@ -440,83 +440,5 @@ export const insertTranscribedText = async (text: string) => {
   }
 };
 
-export const finalizeReport = async (): Promise<{
-  success: boolean;
-  count: number;
-  error?: string;
-}> => {
-  console.log("--- Checkbox Based Finalize Started ---");
-  try {
-    return await Word.run(async (context) => {
-      const contentControls = context.document.contentControls;
 
-      // STEP 1: Sirf Tag load karein (Sab se safe approach)
-      context.load(contentControls, "items/tag");
-      await context.sync();
-
-      const items = contentControls.items;
-      const idsToDelete: string[] = [];
-
-      // STEP 2: Unticked IDs ki list banayein
-      for (let i = 0; i < items.length; i++) {
-        const cc = items[i];
-        const tag = (cc.tag || "").trim().toLowerCase();
-
-        if (tag.startsWith("chk_")) {
-          // Checkbox ki property load karne ki koshish karein
-          cc.load("checkboxContentControl/isChecked");
-          try {
-            await context.sync(); // Yahan sync lazmi hai check karne ke liye
-
-            if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
-              const parts = tag.split("_");
-              if (parts.length > 1) {
-                const id = parts[1];
-                if (!idsToDelete.includes(id)) {
-                  idsToDelete.push(id);
-                }
-              }
-            }
-          } catch (e) {
-            // Agar ye checkbox nahi hai to isko ignore karein
-            console.warn(`Tag ${tag} is not a valid checkbox control.`);
-          }
-        }
-      }
-
-      console.log("Found Unticked IDs to delete:", idsToDelete);
-
-      if (idsToDelete.length === 0) {
-        return { success: true, count: 0 };
-      }
-
-      // STEP 3: Sab related tags (chk_ aur sec_) delete karein
-      let removedCount = 0;
-      for (let i = items.length - 1; i >= 0; i--) {
-        const cc = items[i];
-        const tag = (cc.tag || "").trim().toLowerCase();
-        const parts = tag.split("_");
-
-        if (parts.length > 1) {
-          const prefix = parts[0]; // 'chk' or 'sec'
-          const id = parts[1];
-
-          if (idsToDelete.includes(id)) {
-            if (prefix === "chk" || prefix === "sec") {
-              console.log(`[Action] Deleting: ${tag}`);
-              cc.delete(true); // Content + Control dono khatam
-              removedCount++;
-            }
-          }
-        }
-      }
-
-      await context.sync();
-      return { success: true, count: removedCount };
-    });
-  } catch (e: any) {
-    console.error("Finalize Error:", e);
-    return { success: false, count: 0, error: e.message };
-  }
-};
 
