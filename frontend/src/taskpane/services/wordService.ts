@@ -240,22 +240,6 @@
 
 /* global Word */
 
-export const insertTranscribedText = async (text: string) => {
-  try {
-    await Word.run(async (context) => {
-      const selection = context.document.getSelection();
-      selection.font.hidden = false;
-      const range = selection.insertText(text + " ", Word.InsertLocation.replace);
-      range.font.size = 12;
-      // range.font.italic = true;
-      range.font.name = "Arial";
-      range.font.color = null;
-      await context.sync();
-    });
-  } catch (error) {
-    console.error("Transcription Error:", error);
-  }
-};
 
 export const insertImageInWord = async (base64Image: string) => {
   try {
@@ -429,3 +413,29 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 };
 
 // ... baqi functions (insertImage, insertTranscribedText, syncTableData) waisay hi rehne dein
+
+export const insertTranscribedText = async (text: string) => {
+  try {
+    await Word.run(async (context) => {
+      // Current selection (cursor position) pakrein
+      const selection = context.document.getSelection();
+      
+      // Text ko cursor k aage insert karein (taake real-time typing lage)
+      const range = selection.insertText(text, Word.InsertLocation.end);
+      
+      // James's Formatting
+      range.font.size = 11;
+      // range.font.italic = true;
+      range.font.name = "Calibri";
+      range.font.color = null; // Automatic based on theme
+      
+      // Cursor ko naye text k aakhir mein le jayein taake agla lafz agay aye
+      range.select(Word.SelectionMode.end);
+      
+      await context.sync();
+    });
+  } catch (error) {
+    // Console error ko ignore karein taake user disturb na ho
+    console.warn("Word API Syncing...");
+  }
+};

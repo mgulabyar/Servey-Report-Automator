@@ -362,55 +362,68 @@ const handleFinalize = async () => {
   //   }
   // };
 
-  const startRecording = async () => {
-    try {
-      // Browser Speech Recognition Setup
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        showToast("Browser does not support real-time dictation", "error");
-        return;
+  // App.tsx ke andar sirf ye functions update karein
+
+
+const startRecording = async () => {
+  try {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      showToast("Real-time dictation not supported in this browser", "error");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+
+    recognition.continuous = true; // Bolte waqt chalta rahega, band nahi hoga
+    recognition.interimResults = false; // "False" isliye taake sirf mukammal words insert hon (Warna Word crash ho jata hai)
+    
+    // Language: '' (Khali chorne se browser system language dhoond leta hai)
+    // Agar James sirf English use karta hai to 'en-US' behtar hai
+    recognition.lang = ''; 
+
+    recognition.onresult = async (event: any) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
       }
-
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
       
-      recognition.continuous = true; // Bolte waqt chalta rahega
-      recognition.interimResults = false; // Sirf final words bhejega (fast and clean)
-      recognition.lang = 'en-GB'; // James UK ka hai to English UK set ki hai
+      if (finalTranscript) {
+        // Jaise hi lafz final ho, Word mein bhej do (Real-time feel)
+        await insertTranscribedText(finalTranscript + " ");
+      }
+    };
 
-      recognition.onresult = async (event: any) => {
-        const lastResultIndex = event.results.length - 1;
-        const transcript = event.results[lastResultIndex][0].transcript;
-        
-        // Word mein real-time insert karein
-        await insertTranscribedText(transcript + " ");
-      };
+    recognition.onerror = (event: any) => {
+      console.error("Speech Recognition Error:", event.error);
+      if(event.error === 'not-allowed') showToast("Mic permission denied", "error");
+    };
 
-      recognition.onerror = (event: any) => {
-        console.error("Speech Error:", event.error);
-        setIsRecording(false);
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognition.start();
-      setIsRecording(true);
-      showToast("Listening... speak now", "success");
-
-    } catch (err) {
-      showToast("Microphone access denied", "error");
-    }
-  };
-
-  const stopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
+    recognition.onend = () => {
+      // Agar recording khud band ho jaye (boht dair khamosh rehne par)
       setIsRecording(false);
-      showToast("Dictation stopped");
-    }
-  };
+    };
+
+    recognition.start();
+    setIsRecording(true);
+    showToast("Listening... speak naturally", "success");
+
+  } catch (err) {
+    showToast("Could not start microphone", "error");
+  }
+};
+
+const stopRecording = () => {
+  if (recognitionRef.current) {
+    recognitionRef.current.stop();
+    setIsRecording(false);
+    showToast("Dictation completed");
+  }
+};
   const sendToBackend = async (audioBlob: Blob) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.wav");
