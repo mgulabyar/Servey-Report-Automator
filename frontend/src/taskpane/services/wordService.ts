@@ -75,55 +75,82 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 
       const contentControls = context.document.contentControls;
 
-      // Tags aur checkbox state load karo
-      context.load(contentControls, "items/tag, items/checkboxContentControl/isChecked");
+      // IMPORTANT: type bhi load karo
+      context.load(contentControls, "items/tag, items/type");
       await context.sync();
 
       const items = contentControls.items;
+
       const idsToDelete: string[] = [];
 
-      // STEP 1: Unticked checkbox ki IDs collect karo
+      // STEP 1: checkbox controls load karo
       for (let i = 0; i < items.length; i++) {
+
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
 
         if (tag.startsWith("chk_")) {
+
+          const checkbox = cc.checkboxContentControl;
+          context.load(checkbox, "isChecked");
+
+        }
+
+      }
+
+      await context.sync();
+
+      // STEP 2: Unticked IDs collect karo
+      for (let i = 0; i < items.length; i++) {
+
+        const cc = items[i];
+        const tag = (cc.tag || "").toLowerCase().trim();
+
+        if (tag.startsWith("chk_")) {
+
           const id = tag.split("_")[1];
 
-          if (
-            cc.checkboxContentControl &&
-            cc.checkboxContentControl.isChecked === false
-          ) {
+          if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
+
             if (!idsToDelete.includes(id)) {
               idsToDelete.push(id);
             }
+
           }
+
         }
+
       }
 
       console.log("IDs Marked for deletion:", idsToDelete);
 
       let removedCount = 0;
 
-      // STEP 2: related checkbox aur section delete karo
+      // STEP 3: related checkbox + section delete
       for (let i = items.length - 1; i >= 0; i--) {
+
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
         const parts = tag.split("_");
 
         if (parts.length > 1) {
+
           const prefix = parts[0];
           const id = parts[1];
 
           if (idsToDelete.includes(id)) {
 
             if (prefix === "chk" || prefix === "sec") {
+
               cc.delete(true);
               removedCount++;
+
             }
 
           }
+
         }
+
       }
 
       await context.sync();
@@ -131,8 +158,12 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
       return { success: true, count: removedCount };
 
     });
+
   } catch (error: any) {
+
     console.error("Finalize Error:", error);
+
     return { success: false, count: 0, error: error.message };
+
   }
 };
