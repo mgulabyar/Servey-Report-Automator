@@ -413,29 +413,61 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 };
 
 // ... baqi functions (insertImage, insertTranscribedText, syncTableData) waisay hi rehne dein
+// ye kam kr rhi ha
+// export const insertTranscribedText = async (text: string) => {
+//   try {
+//     await Word.run(async (context) => {
+//       // Current selection (cursor position) pakrein
+//       const selection = context.document.getSelection();
+      
+//       // Text ko cursor k aage insert karein (taake real-time typing lage)
+//       const range = selection.insertText(text, Word.InsertLocation.end);
+      
+//       // James's Formatting
+//       range.font.size = 11;
+//       // range.font.italic = true;
+//       range.font.name = "Calibri";
+//       range.font.color = null; // Automatic based on theme
+      
+//       // Cursor ko naye text k aakhir mein le jayein taake agla lafz agay aye
+//       range.select(Word.SelectionMode.end);
+      
+//       await context.sync();
+//     });
+//   } catch (error) {
+//     // Console error ko ignore karein taake user disturb na ho
+//     console.warn("Word API Syncing...");
+//   }
+// };
+
+
+/* global Word */
 
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
-      // Current selection (cursor position) pakrein
+      // 1. Current cursor position pakrein
       const selection = context.document.getSelection();
       
-      // Text ko cursor k aage insert karein (taake real-time typing lage)
+      // 2. Text ko cursor ke aakhir mein (End) insert karein
+      // InsertLocation.end selection ke baad text dalta hai
       const range = selection.insertText(text, Word.InsertLocation.end);
       
-      // James's Formatting
+      // 3. Client ki Requirement: Arial, 11px
+      range.font.name = "Arial";
       range.font.size = 11;
-      // range.font.italic = true;
-      range.font.name = "Calibri";
-      range.font.color = null; // Automatic based on theme
-      
-      // Cursor ko naye text k aakhir mein le jayein taake agla lafz agay aye
+      range.font.bold = false;
+      range.font.italic = false; // Regular font as per latest request
+      range.font.color = null; 
+
+      // 4. Sab se Aham: Cursor ko foran naye lafz ke aakhir mein le jayein
+      // Taake agla lafz hamesha is ke baad hi aye
       range.select(Word.SelectionMode.end);
       
       await context.sync();
     });
   } catch (error) {
-    // Console error ko ignore karein taake user disturb na ho
-    console.warn("Word API Syncing...");
+    // API errors ko ignore karein taake typing flow na tute
+    console.warn("Syncing words...");
   }
 };

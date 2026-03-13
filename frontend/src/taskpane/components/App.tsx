@@ -365,58 +365,58 @@ const handleFinalize = async () => {
   // App.tsx ke andar sirf ye functions update karein
 
 
+// App.tsx ke andar startRecording function ko is se badlein:
+
 const startRecording = async () => {
   try {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
-      showToast("Real-time dictation not supported in this browser", "error");
+      showToast("Real-time dictation not supported", "error");
       return;
     }
 
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
 
-    recognition.continuous = true; // Bolte waqt chalta rahega, band nahi hoga
-    recognition.interimResults = false; // "False" isliye taake sirf mukammal words insert hon (Warna Word crash ho jata hai)
-    
-    // Language: '' (Khali chorne se browser system language dhoond leta hai)
-    // Agar James sirf English use karta hai to 'en-US' behtar hai
-    recognition.lang = ''; 
+    recognition.continuous = true;
+    // Word-by-word feel k liye isay true rakhen gy lekin results ko filter karenge
+    recognition.interimResults = true; 
+    recognition.lang = 'en-GB'; 
+
+    let lastSentText = ""; // Track karne k liye k kia bhej chuke hain
 
     recognition.onresult = async (event: any) => {
-      let finalTranscript = '';
+      let currentResult = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
+            // Sirf wahi lafz nikalna jo abhi finalize hua hai
+            const newText = event.results[i][0].transcript.trim();
+            
+            // Duplicate check: Agar ye phrase pehle nahi bheja to insert karo
+            if (newText !== lastSentText) {
+                await insertTranscribedText(newText + " ");
+                lastSentText = newText;
+            }
         }
-      }
-      
-      if (finalTranscript) {
-        // Jaise hi lafz final ho, Word mein bhej do (Real-time feel)
-        await insertTranscribedText(finalTranscript + " ");
       }
     };
 
     recognition.onerror = (event: any) => {
       console.error("Speech Recognition Error:", event.error);
-      if(event.error === 'not-allowed') showToast("Mic permission denied", "error");
-    };
-
-    recognition.onend = () => {
-      // Agar recording khud band ho jaye (boht dair khamosh rehne par)
       setIsRecording(false);
     };
 
+    recognition.onend = () => { setIsRecording(false); };
+
     recognition.start();
     setIsRecording(true);
-    showToast("Listening... speak naturally", "success");
+    showToast("Listening... speak now", "success");
 
   } catch (err) {
-    showToast("Could not start microphone", "error");
+    showToast("Mic Error", "error");
   }
 };
-
 const stopRecording = () => {
   if (recognitionRef.current) {
     recognitionRef.current.stop();
