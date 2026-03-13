@@ -240,6 +240,7 @@
 
 /* global Word */
 
+
 export const insertImageInWord = async (base64Image: string) => {
   try {
     await Word.run(async (context) => {
@@ -335,23 +336,23 @@ export const insertImageInWord = async (base64Image: string) => {
 //         if (tag.startsWith("sec_")) {
 //           if (cc.font.hidden === true) {
 //             // Agar hidden hai (Untick tha) to Heading+Para sab delete
-//             cc.delete(false);
+//             cc.delete(false); 
 //             count++;
 //           } else {
 //             // AGAR VISIBLE HAI: James ne kaha heading delete kardo, sirf para rehne do
-//             // To hum poora control wrapper urha denge.
+//             // To hum poora control wrapper urha denge. 
 //             // NOTE: Agar heading sec_ tag k andar hai, to wo bhi delete ho jayegi.
-//             cc.delete(true);
+//             cc.delete(true); 
 //           }
-//         }
+//         } 
 //         // 2. Handle Checkboxes (chk_...) - James wants these GONE 100%
 //         else if (tag.startsWith("chk_")) {
 //           // cc.delete(false) control aur uska symbol (icon) dono urha dega
 //           cc.delete(false);
-//         }
+//         } 
 //         // 3. Metadata boxes (val, rate, act) - Sirf wrapper hatao
 //         else if (tag.startsWith("val_") || tag.startsWith("rate_") || tag.startsWith("act_")) {
-//           cc.delete(true);
+//           cc.delete(true); 
 //         }
 //       }
 
@@ -363,12 +364,15 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
+
+
+
 // export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
 //   console.log("--- Safe Finalize Started ---");
 //   try {
 //     return await Word.run(async (context) => {
 //       const contentControls = context.document.contentControls;
-
+      
 //       // Load properties
 //       context.load(contentControls, "items/tag, items/font/hidden, items/font/color");
 //       await context.sync();
@@ -408,15 +412,17 @@ export const insertImageInWord = async (base64Image: string) => {
 //   }
 // };
 
+
+
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
       // 1. Current cursor position hasil karein
       const selection = context.document.getSelection();
-
+      
       // 2. Text ko cursor ke baad (after) insert karein
       const range = selection.insertText(text, Word.InsertLocation.after);
-
+      
       // 3. Formatting apply karein
       range.font.name = "Arial";
       range.font.size = 10;
@@ -425,7 +431,7 @@ export const insertTranscribedText = async (text: string) => {
       // 4. SAB SE ZAROORI: Cursor ko naye insert kiye gaye text ke end par move karein
       // Is se agla word hamesha iske agay ayega
       range.select(Word.SelectionMode.end);
-
+      
       // Word ko foran update karein
       await context.sync();
     });
@@ -439,62 +445,66 @@ export const finalizeReport = async (): Promise<{
   count: number;
   error?: string;
 }> => {
-  console.log("--- Targeted Finalize Started ---");
+  console.log("--- Checkbox Based Finalize Started ---");
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
 
-      // STEP 1: Sirf 'tag' aur 'type' load karein (Safe and Light)
-      context.load(contentControls, "items/tag, items/type");
+      // STEP 1: Sirf Tag load karein (Sab se safe approach)
+      context.load(contentControls, "items/tag");
       await context.sync();
 
       const items = contentControls.items;
       const idsToDelete: string[] = [];
 
-      // STEP 2: Unticked Checkboxes ki IDs dhoondein
+      // STEP 2: Unticked IDs ki list banayein
       for (let i = 0; i < items.length; i++) {
         const cc = items[i];
-        const tag = (cc.tag || "").trim();
+        const tag = (cc.tag || "").trim().toLowerCase();
 
-        // Sirf un controls ko touch karein jo 'chk_' hain aur Type 'CheckBox' hai
-        if (tag.startsWith("chk_") && cc.type === "CheckBox") {
+        if (tag.startsWith("chk_")) {
+          // Checkbox ki property load karne ki koshish karein
           cc.load("checkboxContentControl/isChecked");
-          await context.sync(); // Individual sync taake GeneralException na aaye
+          try {
+            await context.sync(); // Yahan sync lazmi hai check karne ke liye
 
-          if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
-            const idParts = tag.split("_");
-            if (idParts.length > 1) {
-              idsToDelete.push(idParts[1]); // ID save karli (e.g. "1")
+            if (cc.checkboxContentControl && cc.checkboxContentControl.isChecked === false) {
+              const parts = tag.split("_");
+              if (parts.length > 1) {
+                const id = parts[1];
+                if (!idsToDelete.includes(id)) {
+                  idsToDelete.push(id);
+                }
+              }
             }
+          } catch (e) {
+            // Agar ye checkbox nahi hai to isko ignore karein
+            console.warn(`Tag ${tag} is not a valid checkbox control.`);
           }
         }
       }
 
-      console.log("IDs to be removed (Checkbox + Section):", idsToDelete);
+      console.log("Found Unticked IDs to delete:", idsToDelete);
 
       if (idsToDelete.length === 0) {
         return { success: true, count: 0 };
       }
 
-      // STEP 3: Linked 'chk_' aur 'sec_' dono ko delete karein
+      // STEP 3: Sab related tags (chk_ aur sec_) delete karein
       let removedCount = 0;
-      // Reverse loop lazmi hai taake deletion ke waqt index kharab na ho
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
-        const tag = (cc.tag || "").trim();
+        const tag = (cc.tag || "").trim().toLowerCase();
         const parts = tag.split("_");
 
         if (parts.length > 1) {
-          const prefix = parts[0].toLowerCase(); // 'chk' or 'sec'
-          const id = parts[1]; // '1', '2' etc.
+          const prefix = parts[0]; // 'chk' or 'sec'
+          const id = parts[1];
 
-          // Agar ye ID delete honi hai aur prefix chk/sec hai
           if (idsToDelete.includes(id)) {
             if (prefix === "chk" || prefix === "sec") {
-              console.log(`[Deleting] ${tag}`);
-
-              // delete(true) content control aur uske andar ka content (icon/text) dono urra deta hai
-              cc.delete(true);
+              console.log(`[Action] Deleting: ${tag}`);
+              cc.delete(true); // Content + Control dono khatam
               removedCount++;
             }
           }
@@ -502,11 +512,11 @@ export const finalizeReport = async (): Promise<{
       }
 
       await context.sync();
-      console.log(`Finalize Complete. Total items removed: ${removedCount}`);
       return { success: true, count: removedCount };
     });
   } catch (e: any) {
     console.error("Finalize Error:", e);
-    return { success: false, count: 0, error: "Error: " + e.message };
+    return { success: false, count: 0, error: e.message };
   }
 };
+
