@@ -69,15 +69,11 @@ export const insertTranscribedText = async (text: string) => {
 // };
 
 //////////////////////////// iu is  sucessful ha hiden succestion delete kr ny k lie.//////
-export const finalizeReport = async (): Promise<{
-  success: boolean;
-  count: number;
-  error?: string;
-}> => {
+export const finalizeReport = async (): Promise<{ success: boolean; count: number; error?: string }> => {
   try {
     return await Word.run(async (context) => {
       const contentControls = context.document.contentControls;
-
+      
       // 1. Tags aur Hidden status load karein
       context.load(contentControls, "items/tag, items/font/hidden");
       await context.sync();
@@ -85,50 +81,40 @@ export const finalizeReport = async (): Promise<{
       const items = contentControls.items;
       const idsToDelete: string[] = [];
 
-      // STEP 1: Pehle Hidden Sections (sec_) ki IDs ki list banaein
+      // STEP 1: Pehle sirf Hidden Sections ki ID nikaalein (Ye list banana zaroori hai)
       for (let i = 0; i < items.length; i++) {
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
 
+        // Agar Paragraph hidden hai, to uski ID note karlo
         if (tag.startsWith("sec_") && cc.font.hidden === true) {
-          const parts = tag.split("_");
-          if (parts.length > 1) {
-            const id = parts[1];
-            if (!idsToDelete.includes(id)) {
-              idsToDelete.push(id);
-            }
+          const id = tag.split("_")[1]; 
+          if (id && !idsToDelete.includes(id)) {
+            idsToDelete.push(id);
           }
         }
       }
 
-      console.log("Found IDs to delete (Checkbox + Section):", idsToDelete);
+      console.log("IDs Marked for full deletion:", idsToDelete);
 
-      if (idsToDelete.length === 0) {
-        return { success: true, count: 0 };
-      }
-
-      // STEP 2: Ab in IDs se linked 'chk_' AUR 'sec_' dono ko delete karein
+      // STEP 2: Ab in IDs ke 'chk_' aur 'sec_' dono ko delete karein
       let removedCount = 0;
-
-      // Reverse loop taake deletion ke waqt index kharab na ho
+      
+      // Reverse loop taake Word ka index kharab na ho
       for (let i = items.length - 1; i >= 0; i--) {
         const cc = items[i];
         const tag = (cc.tag || "").toLowerCase().trim();
         const parts = tag.split("_");
-
+        
         if (parts.length > 1) {
-          const prefix = parts[0]; // 'chk' or 'sec'
-          const id = parts[1]; // '1', '2' etc.
+          const prefix = parts[0]; 
+          const id = parts[1];
 
+          // AGAR ID match ho jaye, to chahye checkbox ho ya section, delete kar do!
           if (idsToDelete.includes(id)) {
-            // Checkbox ho ya Section, dono ko target karein
             if (prefix === "chk" || prefix === "sec") {
-              console.log(`[Deleting] Tag: ${tag}`);
-
-              // Pehle range clear karein phir control delete karein (Checkbox ke liye zaroori hai)
-              cc.getRange().delete();
-              cc.delete(false);
-
+              // SIRF ye ek line kafi hai, range wala panga khatam
+              cc.delete(true); 
               removedCount++;
             }
           }
