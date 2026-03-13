@@ -367,12 +367,13 @@ const handleFinalize = async () => {
 
 // App.tsx ke andar startRecording function ko is se badlein:
 
+// App.tsx ke andar startRecording function ko is se replace karein:
+
 const startRecording = async () => {
   try {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
     if (!SpeechRecognition) {
-      showToast("Real-time dictation not supported", "error");
+      showToast("Speech not supported", "error");
       return;
     }
 
@@ -380,38 +381,44 @@ const startRecording = async () => {
     recognitionRef.current = recognition;
 
     recognition.continuous = true;
-    // Word-by-word feel k liye isay true rakhen gy lekin results ko filter karenge
-    recognition.interimResults = true; 
-    recognition.lang = 'en-GB'; 
+    recognition.interimResults = true; // Taake browser tezi se detect kare
+    recognition.lang = 'en-GB';
 
-    let lastSentText = ""; // Track karne k liye k kia bhej chuke hain
+    // Queue management variables
+    let finalizedIndex = 0;
+    let isProcessing = false;
+    const textQueue: string[] = [];
+
+    // Queue ko process karne wala function
+    const processQueue = async () => {
+      if (isProcessing || textQueue.length === 0) return;
+      isProcessing = true;
+      const nextText = textQueue.shift();
+      if (nextText) {
+        await insertTranscribedText(nextText);
+      }
+      isProcessing = false;
+      processQueue(); // Agla lafz check karo
+    };
 
     recognition.onresult = async (event: any) => {
-      let currentResult = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-            // Sirf wahi lafz nikalna jo abhi finalize hua hai
-            const newText = event.results[i][0].transcript.trim();
-            
-            // Duplicate check: Agar ye phrase pehle nahi bheja to insert karo
-            if (newText !== lastSentText) {
-                await insertTranscribedText(newText + " ");
-                lastSentText = newText;
-            }
+        // Jab browser lafz finalize kare (isFinal)
+        if (event.results[i].isFinal && i >= finalizedIndex) {
+          const newChunk = event.results[i][0].transcript.trim();
+          textQueue.push(newChunk + " "); // Queue mein dalo
+          finalizedIndex = i + 1;
+          processQueue(); // Queue chalana shuru karo
         }
       }
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech Recognition Error:", event.error);
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => { setIsRecording(false); };
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
 
     recognition.start();
     setIsRecording(true);
-    showToast("Listening... speak now", "success");
+    showToast("Listening... speak naturally", "success");
 
   } catch (err) {
     showToast("Mic Error", "error");

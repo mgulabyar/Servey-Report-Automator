@@ -443,31 +443,31 @@ export const finalizeReport = async (): Promise<{ success: boolean; count: numbe
 
 /* global Word */
 
+/* global Word */
+
 export const insertTranscribedText = async (text: string) => {
   try {
     await Word.run(async (context) => {
-      // 1. Current cursor position pakrein
+      // 1. Current selection (cursor position) pakrein
       const selection = context.document.getSelection();
       
-      // 2. Text ko cursor ke aakhir mein (End) insert karein
-      // InsertLocation.end selection ke baad text dalta hai
-      const range = selection.insertText(text, Word.InsertLocation.end);
+      // 2. Text ko selection ke baad (After) insert karein
+      // "After" use karne se purana text apni jagah rehta hai aur naya agay jata hai
+      const range = selection.insertText(text, Word.InsertLocation.after);
       
-      // 3. Client ki Requirement: Arial, 11px
+      // 3. Arial 11px Formatting
       range.font.name = "Arial";
-      range.font.size = 11;
+      range.font.size = 10;
       range.font.bold = false;
-      range.font.italic = false; // Regular font as per latest request
-      range.font.color = null; 
+      range.font.italic = false;
+      range.font.color = null; // Dark mode aur light mode dono k liye black fix
 
-      // 4. Sab se Aham: Cursor ko foran naye lafz ke aakhir mein le jayein
-      // Taake agla lafz hamesha is ke baad hi aye
+      // 4. Cursor ko is naye lafz ke bilkul end par move karein
       range.select(Word.SelectionMode.end);
       
       await context.sync();
     });
   } catch (error) {
-    // API errors ko ignore karein taake typing flow na tute
-    console.warn("Syncing words...");
+    console.warn("Syncing...");
   }
 };
