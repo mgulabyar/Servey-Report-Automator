@@ -1,3 +1,303 @@
+// /* global Office */
+// import React, { useState, useRef } from "react";
+// import axios from "axios";
+// import {
+//   Box,
+//   Typography,
+//   Button,
+//   Paper,
+//   CircularProgress,
+//   AppBar,
+//   Toolbar,
+//   Snackbar,
+//   Alert,
+//   Tabs,
+//   Tab,
+//   Stack,
+// } from "@mui/material";
+// import MicIcon from "@mui/icons-material/Mic";
+// import StopIcon from "@mui/icons-material/Stop";
+// import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+// import AlternateEmailIcon from "@mui/icons-material/AlternateEmail";
+// import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+// import { finalizeReport, insertImageInWord, insertTranscribedText } from "../services/wordService";
+
+// const NAVY = "#123048";
+// const BACKEND_URL = "https://survey-report-api.vercel.app/api/transcribe";
+
+// const App: React.FC = () => {
+//   const recognitionRef = useRef<any>(null);
+//   const [tabValue, setTabValue] = useState(0);
+//   const [toast, setToast] = useState({ open: false, msg: "", severity: "success" as any });
+//   const [isRecording, setIsRecording] = useState(false);
+//   const [actionLoading, setActionLoading] = useState(false);
+
+ 
+//   const showToast = (msg: string, severity: "success" | "error" = "success") => {
+//     setToast({ open: true, msg, severity });
+//   };
+
+ 
+//   const handleFinalize = async () => {
+//     setActionLoading(true);
+//     try {
+//       const res = await finalizeReport();
+//       if (res.success) {
+//         if (res.count > 0) {
+//           showToast(`Report Cleaned! ${res.count} items removed`, "success");
+//         } else {
+//           showToast("No hidden items found to clean");
+//         }
+//       }
+//     } catch (err) {
+//       showToast("Error during finalize", "error");
+//     } finally {
+//       setActionLoading(false);
+//     }
+//   };
+
+//   const startRecording = async () => {
+//     try {
+//       const SpeechRecognition =
+//         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+//       if (!SpeechRecognition) {
+//         showToast("Speech not supported", "error");
+//         return;
+//       }
+
+//       const recognition = new SpeechRecognition();
+//       recognitionRef.current = recognition;
+
+//       recognition.continuous = true;
+//       recognition.interimResults = false; // Delay kam karne ke liye isko false rakhein (ya true rakhein agar live preview chahiye)
+//       recognition.lang = "en-GB";
+
+//       // Race condition se bachne ke liye lock
+//       let isInserting = false;
+
+//       recognition.onresult = async (event: any) => {
+//         for (let i = event.resultIndex; i < event.results.length; ++i) {
+//           if (event.results[i].isFinal) {
+//             const newChunk = event.results[i][0].transcript.trim() + " ";
+
+//             // Jab tak पिछला word insert ho raha ho, wait karein
+//             while (isInserting) {
+//               await new Promise((resolve) => setTimeout(resolve, 50));
+//             }
+
+//             isInserting = true;
+//             await insertTranscribedText(newChunk);
+//             isInserting = false;
+//           }
+//         }
+//       };
+
+//       recognition.onerror = () => setIsRecording(false);
+//       recognition.onend = () => setIsRecording(false);
+
+//       recognition.start();
+//       setIsRecording(true);
+//       showToast("Listening...", "success");
+//     } catch (err) {
+//       showToast("Mic Error", "error");
+//     }
+//   };
+
+//   const stopRecording = () => {
+//     if (recognitionRef.current) {
+//       recognitionRef.current.stop();
+//       setIsRecording(false);
+//       showToast("Dictation completed");
+//     }
+//   };
+//   const sendToBackend = async (audioBlob: Blob) => {
+//     const formData = new FormData();
+//     formData.append("file", audioBlob, "recording.wav");
+//     try {
+//       const response = await axios.post(BACKEND_URL, formData, {
+//         headers: { "Content-Type": "multipart/form-data" },
+//       });
+//       if (response.data && response.data.text) {
+//         await insertTranscribedText(response.data.text);
+//         showToast("Dictation inserted successfully");
+//       }
+//     } catch (e) {
+//       console.error("Backend Error:", e);
+//     } finally {
+//       setActionLoading(false);
+//     }
+//   };
+
+//   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+//     const file = event.target.files?.[0];
+//     if (file) {
+//       const reader = new FileReader();
+//       reader.onload = async (e) => {
+//         await insertImageInWord(e.target?.result as string);
+//         showToast("Photo added successfully");
+//       };
+//       reader.readAsDataURL(file);
+//     }
+//   };
+
+//   return (
+//     <Box sx={{ bgcolor: "#F4F7F9", minHeight: "100vh" }}>
+//       <AppBar
+//         position="sticky"
+//         elevation={0}
+//         sx={{ bgcolor: "white", borderBottom: "1px solid #ddd" }}
+//       >
+//         <Toolbar variant="dense">
+//           <Typography sx={{ color: NAVY, fontWeight: 900, fontSize: "14px" }}>
+//             SURVEYOR TOOLS
+//           </Typography>
+//         </Toolbar>
+//         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth">
+//           <Tab label="MEDIA" sx={{ fontWeight: 700 }} />
+//           <Tab label="WORKFLOW" sx={{ fontWeight: 700 }} />
+//         </Tabs>
+//       </AppBar>
+
+//       <Box p={2}>
+//         {tabValue === 0 ? (
+//           <Stack spacing={3}>
+//             <Box>
+//               <Typography
+//                 sx={{
+//                   fontSize: "11px",
+//                   fontWeight: 900,
+//                   color: NAVY,
+//                   mb: 1,
+//                   textTransform: "uppercase",
+//                 }}
+//               >
+//                 AI Voice Dictation
+//               </Typography>
+//               <Paper
+//                 variant="outlined"
+//                 sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}
+//               >
+//                 <Button
+//                   fullWidth
+//                   variant="contained"
+//                   onClick={isRecording ? stopRecording : startRecording}
+//                   startIcon={isRecording ? <StopIcon /> : <MicIcon />}
+//                   sx={{ bgcolor: isRecording ? "#d32f2f" : NAVY, py: 1.2 }}
+//                 >
+//                   {isRecording ? "Stop & Transcribe" : "Start Speaking"}
+//                 </Button>
+//                 {actionLoading && <CircularProgress size={20} sx={{ mt: 1 }} />}
+//               </Paper>
+//             </Box>
+//             <Box>
+//               <Typography
+//                 sx={{
+//                   fontSize: "11px",
+//                   fontWeight: 900,
+//                   color: NAVY,
+//                   mb: 1,
+//                   textTransform: "uppercase",
+//                 }}
+//               >
+//                 Visual Documentation
+//               </Typography>
+//               <Paper
+//                 variant="outlined"
+//                 sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}
+//               >
+//                 <Button
+//                   fullWidth
+//                   variant="outlined"
+//                   component="label"
+//                   startIcon={<PhotoCameraIcon />}
+//                   sx={{ color: NAVY, borderColor: NAVY, py: 1.2 }}
+//                 >
+//                   Insert Site Photo{" "}
+//                   <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
+//                 </Button>
+//               </Paper>
+//             </Box>
+//           </Stack>
+//         ) : (
+//           <Stack spacing={3}>
+//             <Box>
+//               <Typography
+//                 sx={{
+//                   fontSize: "11px",
+//                   fontWeight: 900,
+//                   color: NAVY,
+//                   mb: 1,
+//                   textTransform: "uppercase",
+//                 }}
+//               >
+//                 Finalize Report
+//               </Typography>
+//               <Paper
+//                 variant="outlined"
+//                 sx={{ p: 2, borderLeft: `4px solid ${NAVY}`, bgcolor: "#fff" }}
+//               >
+//                 <Typography variant="body2" sx={{ mb: 2, fontSize: "13px" }}>
+//                   Permanently delete hidden sections to clean the report.
+//                 </Typography>
+//                 <Button
+//                   fullWidth
+//                   variant="contained"
+//                   onClick={handleFinalize}
+//                   startIcon={<CheckCircleIcon />}
+//                   sx={{ bgcolor: NAVY, fontWeight: 700 }}
+//                 >
+//                   Finalize & Clean
+//                 </Button>
+//               </Paper>
+//             </Box>
+//             <Box>
+//               <Typography
+//                 sx={{
+//                   fontSize: "11px",
+//                   fontWeight: 900,
+//                   color: "#d32f2f",
+//                   mb: 1,
+//                   textTransform: "uppercase",
+//                 }}
+//               >
+//                 Submission
+//               </Typography>
+//               <Paper
+//                 variant="outlined"
+//                 sx={{ p: 2, borderLeft: `4px solid #d32f2f`, bgcolor: "#fff" }}
+//               >
+//                 <Button
+//                   fullWidth
+//                   variant="contained"
+//                   onClick={() => (window.location.href = `mailto:typist@completesurveys.co.uk`)}
+//                   startIcon={<AlternateEmailIcon />}
+//                   sx={{ bgcolor: "#d32f2f", fontWeight: 700 }}
+//                 >
+//                   Email to Typist
+//                 </Button>
+//               </Paper>
+//             </Box>
+//           </Stack>
+//         )}
+//       </Box>
+
+//       <Snackbar
+//         open={toast.open}
+//         autoHideDuration={2000}
+//         onClose={() => setToast({ ...toast, open: false })}
+//         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+//       >
+//         <Alert severity={toast.severity} variant="filled" sx={{ fontSize: "11px" }}>
+//           {toast.msg}
+//         </Alert>
+//       </Snackbar>
+//     </Box>
+//   );
+// };
+
+// export default App;
+
+
 /* global Office */
 import React, { useState, useRef } from "react";
 import axios from "axios";
@@ -19,8 +319,7 @@ import MicIcon from "@mui/icons-material/Mic";
 import StopIcon from "@mui/icons-material/Stop";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import AlternateEmailIcon from "@mui/icons-material/AlternateEmail";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import { finalizeReport, insertImageInWord, insertTranscribedText } from "../services/wordService";
+import { insertImageInWord, insertTranscribedText } from "../services/wordService";
 
 const NAVY = "#123048";
 const BACKEND_URL = "https://survey-report-api.vercel.app/api/transcribe";
@@ -32,28 +331,8 @@ const App: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
- 
   const showToast = (msg: string, severity: "success" | "error" = "success") => {
     setToast({ open: true, msg, severity });
-  };
-
- 
-  const handleFinalize = async () => {
-    setActionLoading(true);
-    try {
-      const res = await finalizeReport();
-      if (res.success) {
-        if (res.count > 0) {
-          showToast(`Report Cleaned! ${res.count} items removed`, "success");
-        } else {
-          showToast("No hidden items found to clean");
-        }
-      }
-    } catch (err) {
-      showToast("Error during finalize", "error");
-    } finally {
-      setActionLoading(false);
-    }
   };
 
   const startRecording = async () => {
@@ -67,24 +346,19 @@ const App: React.FC = () => {
 
       const recognition = new SpeechRecognition();
       recognitionRef.current = recognition;
-
       recognition.continuous = true;
-      recognition.interimResults = false; // Delay kam karne ke liye isko false rakhein (ya true rakhein agar live preview chahiye)
+      recognition.interimResults = false;
       recognition.lang = "en-GB";
 
-      // Race condition se bachne ke liye lock
       let isInserting = false;
 
       recognition.onresult = async (event: any) => {
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
             const newChunk = event.results[i][0].transcript.trim() + " ";
-
-            // Jab tak पिछला word insert ho raha ho, wait karein
             while (isInserting) {
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
-
             isInserting = true;
             await insertTranscribedText(newChunk);
             isInserting = false;
@@ -110,23 +384,6 @@ const App: React.FC = () => {
       showToast("Dictation completed");
     }
   };
-  const sendToBackend = async (audioBlob: Blob) => {
-    const formData = new FormData();
-    formData.append("file", audioBlob, "recording.wav");
-    try {
-      const response = await axios.post(BACKEND_URL, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (response.data && response.data.text) {
-        await insertTranscribedText(response.data.text);
-        showToast("Dictation inserted successfully");
-      }
-    } catch (e) {
-      console.error("Backend Error:", e);
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -138,6 +395,10 @@ const App: React.FC = () => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const emailTypist = () => {
+    window.location.href = `mailto:typist@completesurveys.co.uk?subject=Report Ready&body=The report basis is ready for finalization.`;
   };
 
   return (
@@ -162,21 +423,10 @@ const App: React.FC = () => {
         {tabValue === 0 ? (
           <Stack spacing={3}>
             <Box>
-              <Typography
-                sx={{
-                  fontSize: "11px",
-                  fontWeight: 900,
-                  color: NAVY,
-                  mb: 1,
-                  textTransform: "uppercase",
-                }}
-              >
+              <Typography sx={{ fontSize: "11px", fontWeight: 900, color: NAVY, mb: 1, textTransform: "uppercase" }}>
                 AI Voice Dictation
               </Typography>
-              <Paper
-                variant="outlined"
-                sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}
-              >
+              <Paper variant="outlined" sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}>
                 <Button
                   fullWidth
                   variant="contained"
@@ -190,21 +440,10 @@ const App: React.FC = () => {
               </Paper>
             </Box>
             <Box>
-              <Typography
-                sx={{
-                  fontSize: "11px",
-                  fontWeight: 900,
-                  color: NAVY,
-                  mb: 1,
-                  textTransform: "uppercase",
-                }}
-              >
+              <Typography sx={{ fontSize: "11px", fontWeight: 900, color: NAVY, mb: 1, textTransform: "uppercase" }}>
                 Visual Documentation
               </Typography>
-              <Paper
-                variant="outlined"
-                sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}
-              >
+              <Paper variant="outlined" sx={{ p: 2, textAlign: "center", borderStyle: "dashed", bgcolor: "#fff" }}>
                 <Button
                   fullWidth
                   variant="outlined"
@@ -212,7 +451,7 @@ const App: React.FC = () => {
                   startIcon={<PhotoCameraIcon />}
                   sx={{ color: NAVY, borderColor: NAVY, py: 1.2 }}
                 >
-                  Insert Site Photo{" "}
+                  Insert Site Photo
                   <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
                 </Button>
               </Paper>
@@ -221,55 +460,17 @@ const App: React.FC = () => {
         ) : (
           <Stack spacing={3}>
             <Box>
-              <Typography
-                sx={{
-                  fontSize: "11px",
-                  fontWeight: 900,
-                  color: NAVY,
-                  mb: 1,
-                  textTransform: "uppercase",
-                }}
-              >
-                Finalize Report
+              <Typography sx={{ fontSize: "11px", fontWeight: 900, color: "#d32f2f", mb: 1, textTransform: "uppercase" }}>
+                Submission
               </Typography>
-              <Paper
-                variant="outlined"
-                sx={{ p: 2, borderLeft: `4px solid ${NAVY}`, bgcolor: "#fff" }}
-              >
+              <Paper variant="outlined" sx={{ p: 2, borderLeft: `4px solid #d32f2f`, bgcolor: "#fff" }}>
                 <Typography variant="body2" sx={{ mb: 2, fontSize: "13px" }}>
-                  Permanently delete hidden sections to clean the report.
+                  Notify the typist team that the report is ready for final review.
                 </Typography>
                 <Button
                   fullWidth
                   variant="contained"
-                  onClick={handleFinalize}
-                  startIcon={<CheckCircleIcon />}
-                  sx={{ bgcolor: NAVY, fontWeight: 700 }}
-                >
-                  Finalize & Clean
-                </Button>
-              </Paper>
-            </Box>
-            <Box>
-              <Typography
-                sx={{
-                  fontSize: "11px",
-                  fontWeight: 900,
-                  color: "#d32f2f",
-                  mb: 1,
-                  textTransform: "uppercase",
-                }}
-              >
-                Submission
-              </Typography>
-              <Paper
-                variant="outlined"
-                sx={{ p: 2, borderLeft: `4px solid #d32f2f`, bgcolor: "#fff" }}
-              >
-                <Button
-                  fullWidth
-                  variant="contained"
-                  onClick={() => (window.location.href = `mailto:typist@completesurveys.co.uk`)}
+                  onClick={emailTypist}
                   startIcon={<AlternateEmailIcon />}
                   sx={{ bgcolor: "#d32f2f", fontWeight: 700 }}
                 >
